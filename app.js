@@ -446,10 +446,36 @@ const promptKo = document.querySelector("#promptKo");
 const promptGoal = document.querySelector("#promptGoal");
 const answerContent = document.querySelector("#answerContent");
 const copyAnswerBtn = document.querySelector("#copyAnswerBtn");
+const favoriteBtn = document.querySelector("#favoriteBtn");
+const masteredBtn = document.querySelector("#masteredBtn");
+const mockAddBtn = document.querySelector("#mockAddBtn");
 const promptList = document.querySelector("#promptList");
 const searchInput = document.querySelector("#searchInput");
 const phraseBank = document.querySelector("#phraseBank");
 const roadmapEl = document.querySelector("#roadmap");
+const statPracticed = document.querySelector("#statPracticed");
+const statMastered = document.querySelector("#statMastered");
+const statFavorites = document.querySelector("#statFavorites");
+const statStreak = document.querySelector("#statStreak");
+const progressText = document.querySelector("#progressText");
+const progressBar = document.querySelector("#progressBar");
+const dailyChecklist = document.querySelector("#dailyChecklist");
+const builderIntro = document.querySelector("#builderIntro");
+const builderReason = document.querySelector("#builderReason");
+const builderExample = document.querySelector("#builderExample");
+const builderFeeling = document.querySelector("#builderFeeling");
+const buildAnswerBtn = document.querySelector("#buildAnswerBtn");
+const copyBuiltBtn = document.querySelector("#copyBuiltBtn");
+const builtAnswer = document.querySelector("#builtAnswer");
+const scoreSliders = document.querySelectorAll(".scoreSlider");
+const scoreResult = document.querySelector("#scoreResult");
+const scoreAdvice = document.querySelector("#scoreAdvice");
+const startMockBtn = document.querySelector("#startMockBtn");
+const nextMockBtn = document.querySelector("#nextMockBtn");
+const resetMockBtn = document.querySelector("#resetMockBtn");
+const mockCounter = document.querySelector("#mockCounter");
+const mockQuestion = document.querySelector("#mockQuestion");
+const mockKorean = document.querySelector("#mockKorean");
 const timerMode = document.querySelector("#timerMode");
 const timerValue = document.querySelector("#timerValue");
 const prepBtn = document.querySelector("#prepBtn");
@@ -471,6 +497,124 @@ let activeDuration = 40;
 let activeMode = "준비 시간";
 let mediaRecorder = null;
 let chunks = [];
+let mockQueue = [];
+let mockIndex = -1;
+
+const checklistItems = [
+  ["meaning", "질문 뜻 확인", "영어 질문을 한국어로 바꿔 말하기"],
+  ["shadow", "쉬운 답변 따라읽기", "왕초보 답변을 3번 소리내기"],
+  ["record", "내 답변 녹음", "90초 타이머로 답변 녹음하기"],
+  ["review", "피드백 저장", "부족한 표현 1개 메모하기"],
+];
+
+const defaultState = {
+  practiced: [],
+  mastered: [],
+  favorites: [],
+  checklist: {},
+  lastVisit: "",
+  streak: 1,
+};
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function loadState() {
+  const saved = localStorage.getItem("opic-studio-state");
+  const state = saved ? JSON.parse(saved) : { ...defaultState };
+  const today = todayKey();
+
+  if (state.lastVisit !== today) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    state.streak = state.lastVisit === yesterdayKey ? (state.streak || 1) + 1 : 1;
+    state.lastVisit = today;
+    state.checklist = {};
+  }
+
+  return {
+    ...defaultState,
+    ...state,
+    practiced: state.practiced || [],
+    mastered: state.mastered || [],
+    favorites: state.favorites || [],
+    checklist: state.checklist || {},
+  };
+}
+
+let appState = loadState();
+
+function saveState() {
+  localStorage.setItem("opic-studio-state", JSON.stringify(appState));
+}
+
+function toggleListValue(listName, value) {
+  const list = new Set(appState[listName]);
+  if (list.has(value)) {
+    list.delete(value);
+  } else {
+    list.add(value);
+  }
+  appState[listName] = [...list];
+  saveState();
+  renderDashboard();
+  renderCurrentPromptActions();
+  renderPromptList();
+}
+
+function markPracticed(promptId) {
+  if (!appState.practiced.includes(promptId)) {
+    appState.practiced.push(promptId);
+    saveState();
+    renderDashboard();
+    renderPromptList();
+  }
+}
+
+function renderDashboard() {
+  const practiced = appState.practiced.length;
+  const mastered = appState.mastered.length;
+  const favorites = appState.favorites.length;
+  const completion = Math.round((mastered / prompts.length) * 100);
+
+  statPracticed.textContent = practiced;
+  statMastered.textContent = mastered;
+  statFavorites.textContent = favorites;
+  statStreak.textContent = `${appState.streak || 1}일`;
+  progressBar.style.width = `${completion}%`;
+  progressText.textContent =
+    completion >= 70
+      ? "IM 답변 구조가 꽤 쌓였습니다. 이제 모의시험 반복 구간입니다."
+      : completion >= 35
+        ? "좋습니다. 경험/비교/롤플레이 질문을 더 완료하면 IM 준비도가 올라갑니다."
+        : "아직 시작 단계입니다. 질문 3개를 먼저 연습하세요.";
+
+  dailyChecklist.innerHTML = checklistItems
+    .map(
+      ([id, title, body]) => `
+        <label class="check-item">
+          <input type="checkbox" data-check="${id}" ${appState.checklist[id] ? "checked" : ""} />
+          <span>
+            <strong>${title}</strong>
+            <span>${body}</span>
+          </span>
+        </label>
+      `,
+    )
+    .join("");
+}
+
+function renderCurrentPromptActions() {
+  const prompt = prompts[currentPromptIndex];
+  const isFavorite = appState.favorites.includes(prompt.id);
+  const isMastered = appState.mastered.includes(prompt.id);
+  favoriteBtn.classList.toggle("active-state", isFavorite);
+  masteredBtn.classList.toggle("active-state", isMastered);
+  favoriteBtn.textContent = isFavorite ? "즐겨찾기 해제" : "즐겨찾기";
+  masteredBtn.textContent = isMastered ? "완료 취소" : "완료 표시";
+}
 
 function formatTime(totalSeconds) {
   const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
@@ -527,11 +671,13 @@ function pickPrompt() {
 
 function renderCurrentPrompt() {
   const prompt = prompts[currentPromptIndex];
+  markPracticed(prompt.id);
   promptLevel.textContent = prompt.levelLabel;
   promptCategory.textContent = prompt.categoryLabel;
   promptText.textContent = prompt.question;
   promptKo.textContent = prompt.korean;
   promptGoal.textContent = prompt.goal;
+  renderCurrentPromptActions();
   renderAnswer();
 }
 
@@ -608,10 +754,100 @@ function renderPromptList() {
           </div>
           <h3>${prompt.question}</h3>
           <p>${prompt.korean}</p>
+          <p class="card-status">
+            ${appState.favorites.includes(prompt.id) ? "저장됨" : "저장 전"} ·
+            ${appState.mastered.includes(prompt.id) ? "완료" : "연습 필요"}
+          </p>
         </article>
       `,
     )
     .join("");
+}
+
+function buildPersonalAnswer() {
+  const parts = [
+    builderIntro.value.trim(),
+    builderReason.value.trim(),
+    builderExample.value.trim(),
+    builderFeeling.value.trim(),
+  ].filter(Boolean);
+
+  builtAnswer.textContent =
+    parts.length > 0
+      ? parts.join(" ")
+      : "빈칸을 채우면 내 답변 초안이 여기에 만들어집니다.";
+}
+
+async function copyBuiltAnswer() {
+  await navigator.clipboard.writeText(builtAnswer.textContent);
+  copyBuiltBtn.textContent = "복사 완료";
+  setTimeout(() => {
+    copyBuiltBtn.textContent = "만든 답변 복사";
+  }, 1200);
+}
+
+function updateScore() {
+  const total = [...scoreSliders].reduce((sum, slider) => sum + Number(slider.value), 0);
+  scoreResult.textContent = `현재 점수 ${total} / 15`;
+  scoreAdvice.textContent =
+    total >= 12
+      ? "좋습니다. 이제 발음보다 끊김을 줄이고 자연스럽게 이어 말하세요."
+      : total >= 8
+        ? "IM 근처입니다. 예시 하나와 감정 마무리를 더 안정적으로 붙여보세요."
+        : "먼저 쉬운 답변을 보고 구조를 따라 말하는 데 집중하세요.";
+}
+
+function shufflePrompts() {
+  return [...prompts].sort(() => Math.random() - 0.5);
+}
+
+function renderMock() {
+  if (mockIndex < 0 || mockQueue.length === 0) {
+    mockCounter.textContent = "문항 0 / 5";
+    mockQuestion.textContent = "질문을 시작하면 여기에 표시됩니다.";
+    mockKorean.textContent = "질문 해석도 함께 볼 수 있습니다.";
+    return;
+  }
+
+  const prompt = mockQueue[mockIndex];
+  mockCounter.textContent = `문항 ${mockIndex + 1} / ${mockQueue.length}`;
+  mockQuestion.textContent = prompt.question;
+  mockKorean.textContent = prompt.korean;
+}
+
+function startMock() {
+  mockQueue = shufflePrompts().slice(0, 5);
+  mockIndex = 0;
+  renderMock();
+  activeDuration = 40;
+  startTimer(activeDuration, "모의 준비");
+}
+
+function nextMock() {
+  if (mockQueue.length === 0) {
+    startMock();
+    return;
+  }
+  mockIndex = Math.min(mockIndex + 1, mockQueue.length - 1);
+  renderMock();
+  activeDuration = 40;
+  startTimer(activeDuration, "모의 준비");
+}
+
+function resetMock() {
+  mockQueue = [];
+  mockIndex = -1;
+  renderMock();
+}
+
+function addCurrentPromptToMock() {
+  const prompt = prompts[currentPromptIndex];
+  if (!mockQueue.some((item) => item.id === prompt.id) && mockQueue.length < 5) {
+    mockQueue.push(prompt);
+  }
+  mockIndex = mockQueue.length - 1;
+  renderMock();
+  document.querySelector("#mock").scrollIntoView({ behavior: "smooth" });
 }
 
 function renderRoadmap() {
@@ -755,10 +991,34 @@ resetBtn.addEventListener("click", () => {
 });
 recordBtn.addEventListener("click", toggleRecording);
 saveNoteBtn.addEventListener("click", saveNotes);
+favoriteBtn.addEventListener("click", () => {
+  toggleListValue("favorites", prompts[currentPromptIndex].id);
+});
+masteredBtn.addEventListener("click", () => {
+  toggleListValue("mastered", prompts[currentPromptIndex].id);
+});
+mockAddBtn.addEventListener("click", addCurrentPromptToMock);
+dailyChecklist.addEventListener("change", (event) => {
+  const item = event.target.closest("[data-check]");
+  if (!item) return;
+  appState.checklist[item.dataset.check] = item.checked;
+  saveState();
+  renderDashboard();
+});
+buildAnswerBtn.addEventListener("click", buildPersonalAnswer);
+copyBuiltBtn.addEventListener("click", copyBuiltAnswer);
+scoreSliders.forEach((slider) => slider.addEventListener("input", updateScore));
+startMockBtn.addEventListener("click", startMock);
+nextMockBtn.addEventListener("click", nextMock);
+resetMockBtn.addEventListener("click", resetMock);
 
+saveState();
+renderDashboard();
 renderRoadmap();
 renderPhraseBank();
 renderPromptList();
 restoreNotes();
 renderCurrentPrompt();
 renderTimer();
+renderMock();
+updateScore();

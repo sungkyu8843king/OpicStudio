@@ -229,16 +229,20 @@ main {
 }
 
 .starter,
+.dashboard,
 .level-map,
 .practice-shell,
+.mock,
 .library,
 .phrases {
   margin-top: 28px;
 }
 
 .starter,
+.dashboard,
 .level-map,
 .practice-shell,
+.mock,
 .library,
 .phrases,
 .practice-panel,
@@ -256,6 +260,10 @@ main {
   margin: 0;
 }
 
+.section-title.compact h2 {
+  font-size: 24px;
+}
+
 .starter-grid,
 .roadmap,
 .phrase-grid {
@@ -265,14 +273,108 @@ main {
   margin-top: 20px;
 }
 
+.stats-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 20px;
+}
+
 .starter-grid article,
 .roadmap article,
+.stats-grid article,
 .phrase-card,
 .prompt-item {
   background: var(--panel-strong);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 18px;
+}
+
+.stats-grid span {
+  color: var(--muted);
+  display: block;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.stats-grid strong {
+  display: block;
+  font-size: 38px;
+  margin: 8px 0;
+}
+
+.stats-grid p {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.progress-card {
+  align-items: center;
+  background: #14212c;
+  border-radius: 8px;
+  color: #fff;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  margin-top: 14px;
+  padding: 20px;
+}
+
+.progress-card p {
+  color: #bdc7d0;
+  line-height: 1.55;
+  margin: 6px 0 0;
+}
+
+.progress-track {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  height: 14px;
+  overflow: hidden;
+}
+
+.progress-track span {
+  background: linear-gradient(90deg, #22c55e, #facc15);
+  display: block;
+  height: 100%;
+  width: 0%;
+}
+
+.daily-checklist {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.check-item {
+  align-items: start;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto 1fr;
+  padding: 14px;
+}
+
+.check-item input {
+  min-height: 0;
+  margin-top: 3px;
+}
+
+.check-item strong {
+  display: block;
+}
+
+.check-item span {
+  color: var(--muted);
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-top: 3px;
 }
 
 .starter-grid span,
@@ -312,6 +414,13 @@ footer p {
   color: var(--muted);
   line-height: 1.65;
   margin: 0;
+}
+
+.prompt-item .card-status {
+  color: var(--teal);
+  font-size: 13px;
+  font-weight: 900;
+  margin-top: 10px;
 }
 
 .practice-grid {
@@ -418,6 +527,20 @@ textarea {
   margin: 6px 0 0;
 }
 
+.prompt-actions,
+.builder-actions,
+.mock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.button.active-state {
+  background: var(--teal);
+  color: #fff;
+}
+
 .answer-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -466,6 +589,31 @@ textarea {
   color: #5f6872;
   line-height: 1.75;
   margin: 0 0 16px;
+  padding: 14px;
+}
+
+.builder {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 16px;
+  padding: 20px;
+}
+
+.builder-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.built-answer {
+  background: #f7f3ea;
+  border-left: 4px solid var(--teal);
+  border-radius: 8px;
+  color: var(--ink);
+  line-height: 1.75;
+  margin: 14px 0 0;
   padding: 14px;
 }
 
@@ -522,7 +670,8 @@ textarea {
 }
 
 .recorder,
-.note-box {
+.note-box,
+.rubric {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 12px;
@@ -538,6 +687,60 @@ audio {
   font-size: 14px;
   line-height: 1.55;
   margin: 0;
+}
+
+.rubric h3 {
+  margin: 0;
+}
+
+.rubric input[type="range"] {
+  padding: 0;
+}
+
+.rubric strong {
+  background: var(--blue-soft);
+  border-radius: 8px;
+  color: var(--blue);
+  padding: 12px;
+}
+
+.rubric p {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.mock-layout {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  margin-top: 20px;
+}
+
+.mock-card,
+.mock-guide {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.mock-card span {
+  color: var(--teal);
+  font-weight: 900;
+}
+
+.mock-card h3 {
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1.25;
+  margin: 12px 0;
+}
+
+.mock-card p,
+.mock-guide p {
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 0 0 10px;
 }
 
 .library-tools {
@@ -606,6 +809,10 @@ footer {
   .hero,
   .practice-grid,
   .starter-grid,
+  .stats-grid,
+  .progress-card,
+  .daily-checklist,
+  .mock-layout,
   .roadmap,
   .prompt-list,
   .phrase-grid {
@@ -638,9 +845,16 @@ footer {
 
   .controls,
   .hero-actions,
+  .prompt-actions,
+  .builder-actions,
+  .mock-actions,
   .library-tools {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .builder-grid {
+    grid-template-columns: 1fr;
   }
 
   label {
