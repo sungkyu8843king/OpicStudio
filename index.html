@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OPIc Studio</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">English speaking practice</p>
+        <h1>OPIc Studio</h1>
+      </div>
+      <nav aria-label="주요 메뉴">
+        <a href="#practice">연습</a>
+        <a href="#library">질문</a>
+        <a href="#planner">플랜</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">IH/AL 목표 학습 루틴</p>
+          <h2>질문을 뽑고, 40초 준비하고, 2분 동안 말해보세요.</h2>
+          <p>
+            오픽에서 자주 나오는 자기소개, 경험, 비교, 롤플레이 질문을
+            실제 시험 흐름처럼 연습할 수 있는 웹 학습 도구입니다.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#practice">바로 연습</a>
+            <a class="button secondary" href="#library">질문 보기</a>
+          </div>
+        </div>
+        <div class="score-panel" aria-label="오늘의 학습 요약">
+          <span>오늘의 목표</span>
+          <strong>3 prompts</strong>
+          <p>준비 40초 + 답변 120초 + 셀프 피드백</p>
+        </div>
+      </section>
+
+      <section id="practice" class="practice-grid">
+        <div class="practice-card">
+          <div class="section-title">
+            <p class="eyebrow">Practice room</p>
+            <h2>랜덤 질문 연습</h2>
+          </div>
+          <div class="controls">
+            <label>
+              카테고리
+              <select id="categorySelect">
+                <option value="all">전체</option>
+                <option value="intro">자기소개</option>
+                <option value="home">집/동네</option>
+                <option value="hobby">취미</option>
+                <option value="experience">경험</option>
+                <option value="roleplay">롤플레이</option>
+              </select>
+            </label>
+            <button id="newPromptBtn" class="button primary" type="button">
+              새 질문
+            </button>
+          </div>
+          <article class="prompt-box">
+            <p id="promptCategory" class="pill">자기소개</p>
+            <h3 id="promptText">
+              Tell me about yourself. What kind of person are you?
+            </h3>
+            <p id="promptTip">
+              현재 일/공부, 성격, 좋아하는 활동, 최근 목표 순서로 자연스럽게
+              연결해보세요.
+            </p>
+          </article>
+        </div>
+
+        <div class="timer-card">
+          <div class="timer-display" aria-live="polite">
+            <span id="timerMode">준비 시간</span>
+            <strong id="timerValue">00:40</strong>
+          </div>
+          <div class="timer-buttons">
+            <button id="prepBtn" class="button secondary" type="button">
+              준비 40초
+            </button>
+            <button id="answerBtn" class="button secondary" type="button">
+              답변 2분
+            </button>
+            <button id="pauseBtn" class="button secondary" type="button">
+              일시정지
+            </button>
+            <button id="resetBtn" class="button secondary" type="button">
+              초기화
+            </button>
+          </div>
+          <div class="recorder">
+            <button id="recordBtn" class="button primary" type="button">
+              녹음 시작
+            </button>
+            <audio id="playback" controls></audio>
+            <p id="recordStatus">마이크 권한을 허용하면 답변을 녹음할 수 있어요.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="feedback">
+        <div class="section-title">
+          <p class="eyebrow">Self check</p>
+          <h2>답변 메모</h2>
+        </div>
+        <div class="feedback-grid">
+          <label>
+            핵심 표현
+            <textarea id="phraseNote" placeholder="예: What I liked most was..."></textarea>
+          </label>
+          <label>
+            개선할 점
+            <textarea id="feedbackNote" placeholder="예: 과거 경험에서 감정 묘사를 더 넣기"></textarea>
+          </label>
+        </div>
+        <button id="saveNoteBtn" class="button primary" type="button">
+          메모 저장
+        </button>
+      </section>
+
+      <section id="library" class="library">
+        <div class="section-title">
+          <p class="eyebrow">Prompt library</p>
+          <h2>기출형 질문 모음</h2>
+        </div>
+        <div id="promptList" class="prompt-list"></div>
+      </section>
+
+      <section id="planner" class="planner">
+        <div class="section-title">
+          <p class="eyebrow">7-day sprint</p>
+          <h2>일주일 학습 플랜</h2>
+        </div>
+        <div class="plan-grid">
+          <article>
+            <span>Day 1</span>
+            <h3>자기소개 템플릿</h3>
+            <p>현재 상황, 성격, 취미, 목표를 90초 답변으로 정리합니다.</p>
+          </article>
+          <article>
+            <span>Day 2</span>
+            <h3>묘사 질문</h3>
+            <p>집, 동네, 카페처럼 익숙한 장소를 디테일하게 설명합니다.</p>
+          </article>
+          <article>
+            <span>Day 3</span>
+            <h3>경험 질문</h3>
+            <p>처음, 최근, 기억에 남는 일을 감정 중심으로 말합니다.</p>
+          </article>
+          <article>
+            <span>Day 4</span>
+            <h3>비교 질문</h3>
+            <p>과거와 현재의 차이를 시제와 연결어로 정리합니다.</p>
+          </article>
+          <article>
+            <span>Day 5</span>
+            <h3>문제 해결</h3>
+            <p>예상치 못한 상황, 해결 과정, 배운 점을 연습합니다.</p>
+          </article>
+          <article>
+            <span>Day 6</span>
+            <h3>롤플레이</h3>
+            <p>질문하기, 대안 제시하기, 일정 변경하기를 반복합니다.</p>
+          </article>
+          <article>
+            <span>Day 7</span>
+            <h3>모의 시험</h3>
+            <p>질문 5개를 랜덤으로 뽑아 끊지 않고 답변합니다.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>OPIc Studio는 개인 학습용 정적 웹앱입니다.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
