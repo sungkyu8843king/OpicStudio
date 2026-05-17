@@ -1,383 +1,429 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OPIc Studio</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <header class="topbar">
-      <a class="brand" href="#top" aria-label="OPIc Studio 홈">
-        <span>OPIc</span>
-        <strong>Studio</strong>
-      </a>
-      <nav aria-label="주요 메뉴">
-        <a href="#dashboard">대시보드</a>
-        <a href="#level-map">로드맵</a>
-        <a href="#practice">연습실</a>
-        <a href="#mock">모의시험</a>
-        <a href="#library">질문은행</a>
-      </nav>
-    </header>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#FF6B35">
+  <meta name="description" content="단체 여행 일정 관리, 실시간 위치 공유, 경비 정산">
+  <title>트립메이트 – 단체 여행 일정 관리</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
 
-    <main id="top">
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Zero to IM speaking lab</p>
-          <h1>영어가 막혀도, 한 문장부터 IM 답변까지.</h1>
-          <p>
-            오픽을 처음 보는 사람도 질문 뜻을 이해하고, 한국어 생각을 영어
-            문장으로 바꾸고, 30초 답변에서 90초 답변까지 늘려가도록 만든
-            학습형 웹사이트입니다.
-          </p>
-          <div class="hero-actions">
-            <a class="button primary" href="#practice">오늘 연습 시작</a>
-            <a class="button ghost" href="#starter">왕초보 규칙 보기</a>
+<div id="app">
+
+  <!-- ── App Bar ─────────────────────────────────── -->
+  <header class="app-bar">
+    <div class="app-bar-left">
+      <span class="app-logo">✈️</span>
+      <span class="app-title" id="appBarTitle">트립메이트</span>
+    </div>
+    <div class="app-bar-right">
+      <button class="icon-btn" id="shareGroupBtn" title="공유" aria-label="그룹 공유">📤</button>
+      <button class="icon-btn" id="leaveGroupBtn" title="그룹 나가기" aria-label="그룹 나가기" style="display:none">⚙️</button>
+    </div>
+  </header>
+
+  <!-- ── Main Content ───────────────────────────── -->
+  <main class="main-content">
+
+    <!-- TAB: 그룹 -->
+    <section class="tab-pane active" id="tab-group">
+
+      <!-- 그룹 없음 -->
+      <div class="empty-hero" id="noGroupState">
+        <div class="empty-plane">✈️</div>
+        <h2>함께 여행을 시작하세요</h2>
+        <p>새 그룹을 만들거나 초대 코드로 참여하세요</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary btn-lg" id="createGroupBtn">+ 그룹 만들기</button>
+          <button class="btn btn-outline btn-lg" id="joinGroupBtn">초대 코드 참여</button>
+        </div>
+      </div>
+
+      <!-- 그룹 있음 -->
+      <div class="group-content hidden" id="groupState">
+
+        <div class="card group-hero-card">
+          <div class="group-emoji-wrap" id="groupEmojiWrap">🏝️</div>
+          <h2 id="groupNameText">여행 그룹</h2>
+          <p class="group-dest" id="groupDestText">목적지 미설정</p>
+          <p class="group-dates" id="groupDatesText">날짜 미설정</p>
+          <div class="invite-row">
+            <span class="invite-label">초대 코드</span>
+            <span class="invite-code" id="inviteCodeDisplay">------</span>
+            <button class="icon-btn sm" id="copyCodeBtn" title="코드 복사">📋</button>
+          </div>
+          <div class="share-btns">
+            <button class="btn btn-kakao" id="kakaoShareBtn">
+              💬 카카오톡 초대
+            </button>
+            <button class="btn btn-outline sm" id="copyLinkBtn">🔗 링크 복사</button>
           </div>
         </div>
-        <aside class="mission-panel" aria-label="오늘 학습 순서">
-          <span>오늘의 20분 루틴</span>
-          <ol>
-            <li>질문 뜻을 한국어로 확인</li>
-            <li>왕초보 답변 3번 따라 읽기</li>
-            <li>IM 예시를 보고 내 답변 녹음</li>
-            <li>부족한 표현 1개 저장</li>
-          </ol>
-        </aside>
-      </section>
 
-      <section id="dashboard" class="dashboard">
-        <div class="section-title">
-          <p class="eyebrow">Learning cockpit</p>
-          <h2>오늘의 학습 현황</h2>
-        </div>
-        <div class="stats-grid">
-          <article>
-            <span>연습한 질문</span>
-            <strong id="statPracticed">0</strong>
-            <p>새 질문을 열거나 질문은행에서 고르면 올라갑니다.</p>
-          </article>
-          <article>
-            <span>완료 표시</span>
-            <strong id="statMastered">0</strong>
-            <p>내 말로 답변 가능한 질문을 완료 처리하세요.</p>
-          </article>
-          <article>
-            <span>즐겨찾기</span>
-            <strong id="statFavorites">0</strong>
-            <p>시험 전 다시 볼 질문만 따로 모읍니다.</p>
-          </article>
-          <article>
-            <span>학습 스트릭</span>
-            <strong id="statStreak">1</strong>
-            <p>오늘 접속한 기록을 기준으로 유지됩니다.</p>
-          </article>
-        </div>
-        <div class="progress-card">
-          <div>
-            <strong>IM 준비도</strong>
-            <p id="progressText">아직 시작 단계입니다. 질문 3개를 먼저 연습하세요.</p>
+        <div class="card">
+          <div class="card-header">
+            <h3>멤버 <span class="badge-count" id="memberBadge">0</span></h3>
+            <button class="btn btn-sm btn-outline" id="addMemberBtn">+ 추가</button>
           </div>
-          <div class="progress-track" aria-label="IM 준비도">
-            <span id="progressBar"></span>
+          <ul class="member-list" id="memberList"></ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>여행 정보</h3>
+            <button class="btn btn-sm btn-outline" id="editTripBtn">수정</button>
+          </div>
+          <div id="tripInfoBlock" class="trip-info-block"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB: 일정 -->
+    <section class="tab-pane" id="tab-schedule">
+      <div class="schedule-toolbar">
+        <div class="trip-range-label" id="tripRangeLabel">그룹을 먼저 만드세요</div>
+        <button class="btn btn-primary sm" id="addPlaceBtn">+ 장소</button>
+      </div>
+      <div class="day-tab-bar" id="dayTabBar"></div>
+      <div class="timeline-wrap" id="timelineWrap">
+        <div class="empty-schedule" id="emptySchedule">
+          <span>📅</span>
+          <p>일정에 장소를 추가해보세요</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: 지도 -->
+    <section class="tab-pane" id="tab-map">
+      <div class="map-top-bar">
+        <button class="map-layer-btn active" data-layer="all">전체</button>
+        <button class="map-layer-btn" data-layer="places">장소</button>
+        <button class="map-layer-btn" data-layer="members">멤버</button>
+        <button class="map-layer-btn" data-layer="route">경로</button>
+      </div>
+      <div id="leafletMap" class="leaflet-map"></div>
+      <div class="map-fabs">
+        <button class="fab sm" id="myLocBtn" title="내 위치">📍</button>
+        <button class="fab" id="openNavBtn" title="길찾기 앱">🧭</button>
+      </div>
+      <!-- Nav app bottom sheet -->
+      <div class="bottom-sheet hidden" id="navSheet">
+        <div class="sheet-handle"></div>
+        <h4 class="sheet-title">지도 앱으로 열기</h4>
+        <div class="nav-app-list">
+          <button class="nav-app-item" data-app="kakao">🗺️<span>카카오맵</span></button>
+          <button class="nav-app-item" data-app="naver">🌿<span>네이버지도</span></button>
+          <button class="nav-app-item" data-app="tmap">🚗<span>T맵</span></button>
+        </div>
+        <button class="btn btn-outline full-width" id="closeNavSheet">닫기</button>
+      </div>
+    </section>
+
+    <!-- TAB: 경비 -->
+    <section class="tab-pane" id="tab-expense">
+      <div class="expense-summary card">
+        <div class="summary-row">
+          <div class="summary-item">
+            <span class="summary-label">총 경비</span>
+            <span class="summary-total" id="expenseTotalDisplay">₩0</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label" id="splitLabel">1인당</span>
+            <span class="summary-per" id="expensePerDisplay">₩0</span>
           </div>
         </div>
-        <div id="dailyChecklist" class="daily-checklist" aria-label="오늘 체크리스트"></div>
-      </section>
-
-      <section id="starter" class="starter">
-        <div class="section-title">
-          <p class="eyebrow">Start here</p>
-          <h2>오픽 왕초보 생존 규칙</h2>
+        <div class="split-toggle-row">
+          <button class="split-btn active" data-split="person">1인당</button>
+          <button class="split-btn" data-split="household">가구당</button>
+          <span class="split-desc" id="splitDesc">멤버 0명 기준</span>
         </div>
-        <div class="starter-grid">
-          <article>
-            <span>1</span>
-            <h3>완벽한 문장보다 멈추지 않는 답변</h3>
-            <p>
-              짧아도 괜찮습니다. 먼저 “질문 답변 + 이유 + 예시” 3칸만 채우면
-              말이 이어집니다.
-            </p>
-          </article>
-          <article>
-            <span>2</span>
-            <h3>한국어 생각을 쉬운 영어로 낮추기</h3>
-            <p>
-              “분위기가 좋다”는 “It feels nice.”처럼 바꿉니다. 어려운 단어를
-              찾다가 멈추는 일을 줄이는 게 먼저입니다.
-            </p>
-          </article>
-          <article>
-            <span>3</span>
-            <h3>IM 답변은 길이가 아니라 구조</h3>
-            <p>
-              시작 문장, 이유 두 개, 짧은 경험, 마무리 감정을 넣으면 자연스럽게
-              60초 이상으로 늘어납니다.
-            </p>
-          </article>
+      </div>
+
+      <div class="cat-filter-bar" id="expenseCatBar">
+        <button class="cat-pill active" data-ecat="all">전체</button>
+        <button class="cat-pill" data-ecat="food">🍽️ 식비</button>
+        <button class="cat-pill" data-ecat="transport">🚌 교통</button>
+        <button class="cat-pill" data-ecat="accommodation">🏨 숙소</button>
+        <button class="cat-pill" data-ecat="activity">🎭 액티비티</button>
+        <button class="cat-pill" data-ecat="shopping">🛍️ 쇼핑</button>
+        <button class="cat-pill" data-ecat="other">📝 기타</button>
+      </div>
+
+      <div class="expense-list" id="expenseList">
+        <div class="empty-expense">
+          <span>💰</span><p>경비를 추가해보세요</p>
         </div>
-      </section>
+      </div>
 
-      <section id="level-map" class="level-map">
-        <div class="section-title">
-          <p class="eyebrow">Roadmap</p>
-          <h2>왕초보에서 IM까지 4단계</h2>
+      <button class="fab expense-fab" id="addExpenseBtn">+ 경비 추가</button>
+    </section>
+
+    <!-- TAB: 맛집 -->
+    <section class="tab-pane" id="tab-local">
+      <div class="local-header">
+        <div class="my-location-row" id="myLocationRow">
+          <span>📍</span>
+          <span id="myLocationText">위치 확인 중...</span>
+          <button class="btn btn-sm btn-outline" id="refreshLocationBtn">새로고침</button>
         </div>
-        <div id="roadmap" class="roadmap"></div>
-      </section>
-
-      <section id="practice" class="practice-shell">
-        <div class="section-title">
-          <p class="eyebrow">Practice room</p>
-          <h2>질문 하나를 끝까지 뜯어보기</h2>
+        <div class="cat-filter-bar scrollable" id="localCatBar">
+          <button class="cat-pill active" data-lcat="all">전체</button>
+          <button class="cat-pill" data-lcat="korean">🍱 한식</button>
+          <button class="cat-pill" data-lcat="cafe">☕ 카페</button>
+          <button class="cat-pill" data-lcat="western">🍝 양식</button>
+          <button class="cat-pill" data-lcat="japanese">🍣 일식</button>
+          <button class="cat-pill" data-lcat="chinese">🥡 중식</button>
+          <button class="cat-pill" data-lcat="snack">🍜 분식</button>
         </div>
+      </div>
+      <div class="restaurant-list" id="restaurantList"></div>
+    </section>
 
-        <div class="practice-grid">
-          <section class="practice-panel" aria-label="오픽 질문 연습">
-            <div class="controls">
-              <label>
-                난이도
-                <select id="levelSelect">
-                  <option value="all">전체</option>
-                  <option value="zero">왕초보</option>
-                  <option value="novice">초보</option>
-                  <option value="im">IM 목표</option>
-                </select>
-              </label>
-              <label>
-                주제
-                <select id="categorySelect">
-                  <option value="all">전체</option>
-                  <option value="intro">자기소개</option>
-                  <option value="home">집/동네</option>
-                  <option value="routine">일상</option>
-                  <option value="hobby">취미</option>
-                  <option value="experience">경험</option>
-                  <option value="comparison">비교</option>
-                  <option value="roleplay">롤플레이</option>
-                </select>
-              </label>
-              <button id="newPromptBtn" class="button primary" type="button">
-                새 질문
-              </button>
-            </div>
+  </main>
 
-            <article class="prompt-card">
-              <div class="prompt-meta">
-                <span id="promptLevel" class="pill">왕초보</span>
-                <span id="promptCategory" class="pill muted">자기소개</span>
-              </div>
-              <h3 id="promptText"></h3>
-              <p id="promptKo" class="translation"></p>
-              <div class="answer-goal">
-                <strong>답변 목표</strong>
-                <p id="promptGoal"></p>
-              </div>
-              <div class="prompt-actions">
-                <button id="favoriteBtn" class="button secondary" type="button">
-                  즐겨찾기
-                </button>
-                <button id="masteredBtn" class="button secondary" type="button">
-                  완료 표시
-                </button>
-                <button id="mockAddBtn" class="button secondary" type="button">
-                  모의시험에 추가
-                </button>
-              </div>
-            </article>
+  <!-- ── Bottom Tab Bar ────────────────────────── -->
+  <nav class="tab-bar" role="tablist" aria-label="주요 메뉴">
+    <button class="tab-btn active" data-tab="group" role="tab" aria-selected="true">
+      <span class="tab-icon">👥</span><span class="tab-label">그룹</span>
+    </button>
+    <button class="tab-btn" data-tab="schedule" role="tab" aria-selected="false">
+      <span class="tab-icon">📅</span><span class="tab-label">일정</span>
+    </button>
+    <button class="tab-btn" data-tab="map" role="tab" aria-selected="false">
+      <span class="tab-icon">🗺️</span><span class="tab-label">지도</span>
+    </button>
+    <button class="tab-btn" data-tab="expense" role="tab" aria-selected="false">
+      <span class="tab-icon">💰</span><span class="tab-label">경비</span>
+    </button>
+    <button class="tab-btn" data-tab="local" role="tab" aria-selected="false">
+      <span class="tab-icon">🍽️</span><span class="tab-label">맛집</span>
+    </button>
+  </nav>
 
-            <div class="answer-tabs" role="tablist" aria-label="답변 보기 방식">
-              <button class="tab active" data-answer-tab="simple" type="button">
-                왕초보 답변
-              </button>
-              <button class="tab" data-answer-tab="im" type="button">
-                IM 답변
-              </button>
-              <button class="tab" data-answer-tab="chunks" type="button">
-                말하기 블록
-              </button>
-            </div>
+</div><!-- #app -->
 
-            <article class="answer-box">
-              <div id="answerContent"></div>
-              <button id="copyAnswerBtn" class="button secondary" type="button">
-                현재 답변 복사
-              </button>
-            </article>
+<!-- ══════════════════════════════════════════════ -->
+<!--  MODALS                                        -->
+<!-- ══════════════════════════════════════════════ -->
 
-            <section class="builder" aria-label="내 답변 조립기">
-              <div class="section-title compact">
-                <p class="eyebrow">Answer builder</p>
-                <h2>내 답변 조립기</h2>
-              </div>
-              <div class="builder-grid">
-                <label>
-                  답변 시작
-                  <input id="builderIntro" placeholder="I would say..." />
-                </label>
-                <label>
-                  이유
-                  <input id="builderReason" placeholder="The biggest reason is..." />
-                </label>
-                <label>
-                  경험 예시
-                  <input id="builderExample" placeholder="For example, last weekend..." />
-                </label>
-                <label>
-                  마무리 감정
-                  <input id="builderFeeling" placeholder="So I felt..." />
-                </label>
-              </div>
-              <div class="builder-actions">
-                <button id="buildAnswerBtn" class="button primary" type="button">
-                  답변 만들기
-                </button>
-                <button id="copyBuiltBtn" class="button secondary" type="button">
-                  만든 답변 복사
-                </button>
-              </div>
-              <p id="builtAnswer" class="built-answer">
-                빈칸을 채우면 내 답변 초안이 여기에 만들어집니다.
-              </p>
-            </section>
-          </section>
-
-          <aside class="coach-panel" aria-label="연습 도구">
-            <div class="timer-display" aria-live="polite">
-              <span id="timerMode">준비 시간</span>
-              <strong id="timerValue">00:40</strong>
-            </div>
-            <div class="timer-buttons">
-              <button id="prepBtn" class="button secondary" type="button">
-                준비 40초
-              </button>
-              <button id="answerBtn" class="button secondary" type="button">
-                답변 90초
-              </button>
-              <button id="pauseBtn" class="button secondary" type="button">
-                일시정지
-              </button>
-              <button id="resetBtn" class="button secondary" type="button">
-                초기화
-              </button>
-            </div>
-
-            <div class="recorder">
-              <button id="recordBtn" class="button primary" type="button">
-                녹음 시작
-              </button>
-              <audio id="playback" controls></audio>
-              <p id="recordStatus">
-                답변을 녹음하고 예시 답변과 비교해보세요.
-              </p>
-            </div>
-
-            <div class="note-box">
-              <label>
-                오늘 외울 표현
-                <textarea
-                  id="phraseNote"
-                  placeholder="예: I usually spend time at home."
-                ></textarea>
-              </label>
-              <label>
-                내 답변 피드백
-                <textarea
-                  id="feedbackNote"
-                  placeholder="예: 이유를 하나 더 말하고 마지막 감정을 넣기"
-                ></textarea>
-              </label>
-              <button id="saveNoteBtn" class="button primary" type="button">
-                메모 저장
-              </button>
-            </div>
-
-            <div class="rubric">
-              <h3>IM 셀프채점</h3>
-              <label>
-                답변 길이
-                <input class="scoreSlider" data-score="length" type="range" min="0" max="5" value="2" />
-              </label>
-              <label>
-                구조
-                <input class="scoreSlider" data-score="structure" type="range" min="0" max="5" value="2" />
-              </label>
-              <label>
-                자연스러움
-                <input class="scoreSlider" data-score="fluency" type="range" min="0" max="5" value="2" />
-              </label>
-              <strong id="scoreResult">현재 점수 6 / 15</strong>
-              <p id="scoreAdvice">이유와 예시를 하나씩 붙이면 바로 좋아집니다.</p>
-            </div>
-          </aside>
+<!-- Create Group -->
+<div class="modal-backdrop hidden" id="modal-create-group" role="dialog" aria-modal="true" aria-labelledby="cg-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="cg-title">새 그룹 만들기</h3>
+      <button class="modal-close" data-close="create-group" aria-label="닫기">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="cgName">그룹 이름 <span class="req">*</span></label>
+        <input id="cgName" type="text" placeholder="예: 2024 제주도 여행" maxlength="30">
+      </div>
+      <div class="form-group">
+        <label for="cgDest">여행지</label>
+        <input id="cgDest" type="text" placeholder="예: 제주도">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="cgStart">출발일</label>
+          <input id="cgStart" type="date">
         </div>
-      </section>
-
-      <section id="mock" class="mock">
-        <div class="section-title">
-          <p class="eyebrow">Mock test</p>
-          <h2>5문항 미니 모의시험</h2>
+        <div class="form-group">
+          <label for="cgEnd">귀환일</label>
+          <input id="cgEnd" type="date">
         </div>
-        <div class="mock-layout">
-          <article class="mock-card">
-            <span id="mockCounter">문항 0 / 5</span>
-            <h3 id="mockQuestion">질문을 시작하면 여기에 표시됩니다.</h3>
-            <p id="mockKorean">질문 해석도 함께 볼 수 있습니다.</p>
-            <div class="mock-actions">
-              <button id="startMockBtn" class="button primary" type="button">
-                랜덤 5문항 시작
-              </button>
-              <button id="nextMockBtn" class="button secondary" type="button">
-                다음 문항
-              </button>
-              <button id="resetMockBtn" class="button secondary" type="button">
-                초기화
-              </button>
-            </div>
-          </article>
-          <article class="mock-guide">
-            <h3>실전 사용법</h3>
-            <p>각 문항마다 40초 준비, 90초 답변을 누르고 녹음하세요.</p>
-            <p>끝나면 셀프채점에서 10점 이상을 목표로 합니다.</p>
-          </article>
-        </div>
-      </section>
+      </div>
+      <div class="form-group">
+        <label for="cgMyName">내 이름 <span class="req">*</span></label>
+        <input id="cgMyName" type="text" placeholder="예: 김여행" maxlength="12">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary full-width" id="confirmCreateGroup">그룹 만들기</button>
+    </div>
+  </div>
+</div>
 
-      <section id="library" class="library">
-        <div class="section-title">
-          <p class="eyebrow">Prompt bank</p>
-          <h2>기출형 질문과 예시 답변</h2>
-        </div>
-        <div class="library-tools">
-          <label>
-            질문 검색
-            <input
-              id="searchInput"
-              type="search"
-              placeholder="예: home, trip, appointment, 자기소개"
-            />
-          </label>
-        </div>
-        <div id="promptList" class="prompt-list"></div>
-      </section>
+<!-- Join Group -->
+<div class="modal-backdrop hidden" id="modal-join-group" role="dialog" aria-modal="true" aria-labelledby="jg-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="jg-title">그룹 참여하기</h3>
+      <button class="modal-close" data-close="join-group" aria-label="닫기">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="jgCode">초대 코드 <span class="req">*</span></label>
+        <input id="jgCode" type="text" placeholder="6자리 코드" maxlength="6" class="code-field" autocapitalize="characters">
+      </div>
+      <div class="form-group">
+        <label for="jgMyName">내 이름 <span class="req">*</span></label>
+        <input id="jgMyName" type="text" placeholder="예: 이여행" maxlength="12">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary full-width" id="confirmJoinGroup">참여하기</button>
+    </div>
+  </div>
+</div>
 
-      <section id="phrases" class="phrases">
-        <div class="section-title">
-          <p class="eyebrow">Phrase bank</p>
-          <h2>영어가 안 나올 때 바로 쓰는 문장</h2>
+<!-- Edit Trip Info -->
+<div class="modal-backdrop hidden" id="modal-edit-trip" role="dialog" aria-modal="true" aria-labelledby="et-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="et-title">여행 정보 수정</h3>
+      <button class="modal-close" data-close="edit-trip" aria-label="닫기">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="etName">그룹 이름</label>
+        <input id="etName" type="text" maxlength="30">
+      </div>
+      <div class="form-group">
+        <label for="etDest">여행지</label>
+        <input id="etDest" type="text" placeholder="예: 제주도">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="etStart">출발일</label>
+          <input id="etStart" type="date">
         </div>
-        <div id="phraseBank" class="phrase-grid"></div>
-      </section>
-    </main>
+        <div class="form-group">
+          <label for="etEnd">귀환일</label>
+          <input id="etEnd" type="date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="etHouseholds">가구 수</label>
+        <input id="etHouseholds" type="number" min="1" max="50" value="1">
+        <small class="hint">경비 가구당 분배에 사용됩니다</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary full-width" id="confirmEditTrip">저장</button>
+    </div>
+  </div>
+</div>
 
-    <footer>
-      <p>
-        OPIc Studio는 개인 학습용 사이트입니다. 실제 시험 문제를 그대로
-        보장하지 않고, 자주 나오는 유형을 바탕으로 연습합니다.
-      </p>
-    </footer>
+<!-- Add Place -->
+<div class="modal-backdrop hidden" id="modal-add-place" role="dialog" aria-modal="true" aria-labelledby="ap-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="ap-title">장소 추가</h3>
+      <button class="modal-close" data-close="add-place" aria-label="닫기">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="apName">장소 이름 <span class="req">*</span></label>
+        <input id="apName" type="text" placeholder="예: 성산일출봉">
+      </div>
+      <div class="form-group">
+        <label for="apType">종류</label>
+        <select id="apType">
+          <option value="attraction">🏛️ 관광지</option>
+          <option value="accommodation">🏨 숙소</option>
+          <option value="restaurant">🍽️ 식당</option>
+          <option value="cafe">☕ 카페</option>
+          <option value="transport">🚌 교통</option>
+          <option value="shopping">🛍️ 쇼핑</option>
+          <option value="other">📍 기타</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="apDay">날짜</label>
+          <select id="apDay"></select>
+        </div>
+        <div class="form-group">
+          <label for="apTime">시간</label>
+          <input id="apTime" type="time" value="09:00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>위치 검색</label>
+        <div class="input-row">
+          <input id="apAddress" type="text" placeholder="장소명 또는 주소">
+          <button class="btn btn-sm btn-outline" id="searchPlaceBtn">검색</button>
+        </div>
+        <div id="placeSearchResults" class="search-results hidden"></div>
+        <div id="apCoords" class="coord-badge hidden"></div>
+      </div>
+      <div class="form-group">
+        <label for="apNote">메모</label>
+        <textarea id="apNote" rows="2" placeholder="예: 예약 필요, 주차 가능"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary full-width" id="confirmAddPlace">추가</button>
+    </div>
+  </div>
+</div>
 
-    <script src="app.js"></script>
-  </body>
+<!-- Add Expense -->
+<div class="modal-backdrop hidden" id="modal-add-expense" role="dialog" aria-modal="true" aria-labelledby="ae-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="ae-title">경비 추가</h3>
+      <button class="modal-close" data-close="add-expense" aria-label="닫기">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="aeName">항목명 <span class="req">*</span></label>
+        <input id="aeName" type="text" placeholder="예: 저녁 삼겹살">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="aeAmount">금액 (원) <span class="req">*</span></label>
+          <input id="aeAmount" type="number" placeholder="0" min="0" step="100">
+        </div>
+        <div class="form-group">
+          <label for="aeCat">카테고리</label>
+          <select id="aeCat">
+            <option value="food">🍽️ 식비</option>
+            <option value="transport">🚌 교통</option>
+            <option value="accommodation">🏨 숙소</option>
+            <option value="activity">🎭 액티비티</option>
+            <option value="shopping">🛍️ 쇼핑</option>
+            <option value="other">📝 기타</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="aePayer">결제자</label>
+        <select id="aePayer"></select>
+      </div>
+      <div class="form-group">
+        <label for="aeDate">날짜</label>
+        <input id="aeDate" type="date">
+      </div>
+      <div class="form-group">
+        <label>영수증 사진</label>
+        <div class="receipt-area">
+          <input type="file" id="aeReceipt" accept="image/*" class="visually-hidden">
+          <button class="btn btn-outline sm" id="receiptPickBtn">📷 사진 첨부</button>
+          <span id="receiptFileName" class="file-label"></span>
+        </div>
+        <div id="receiptThumb" class="receipt-thumb hidden"></div>
+      </div>
+      <div class="form-group">
+        <label for="aeNote">메모</label>
+        <input id="aeNote" type="text" placeholder="예: 할인 적용됨">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary full-width" id="confirmAddExpense">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+<!-- Leaflet + App -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
 </html>
