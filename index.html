@@ -35,7 +35,8 @@
       <div class="empty-hero" id="noGroupState">
         <div class="empty-plane">✈️</div>
         <h2>함께 여행을 시작하세요</h2>
-        <p>새 그룹을 만들거나 초대 코드로 참여하세요</p>
+        <p>카카오 계정으로 로그인 후 그룹을 만들거나 참여하세요</p>
+        <div id="kakaoProfileBanner" class="kakao-profile-banner hidden"></div>
         <div class="empty-actions">
           <button class="btn btn-primary btn-lg" id="createGroupBtn">+ 그룹 만들기</button>
           <button class="btn btn-outline btn-lg" id="joinGroupBtn">초대 코드 참여</button>
@@ -218,6 +219,7 @@
       <button class="modal-close" data-close="create-group" aria-label="닫기">✕</button>
     </div>
     <div class="modal-body">
+      <div class="kakao-modal-strip" id="cgKakaoStrip"></div>
       <div class="form-group">
         <label for="cgName">그룹 이름 <span class="req">*</span></label>
         <input id="cgName" type="text" placeholder="예: 2024 제주도 여행" maxlength="30">
@@ -255,6 +257,7 @@
       <button class="modal-close" data-close="join-group" aria-label="닫기">✕</button>
     </div>
     <div class="modal-body">
+      <div class="kakao-modal-strip" id="jgKakaoStrip"></div>
       <div class="form-group">
         <label for="jgCode">초대 코드 <span class="req">*</span></label>
         <input id="jgCode" type="text" placeholder="6자리 코드" maxlength="6" class="code-field" autocapitalize="characters">

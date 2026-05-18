@@ -7,8 +7,9 @@ const SUPABASE_URL = 'https://nmvfffzpkqyzztiobwtt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_22PPW0eCY3Tvy3vZVZYKFw_yCb8cI2f';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const TM_GROUP_KEY = 'tm_group_id';
+const TM_GROUP_KEY  = 'tm_group_id';
 const TM_MEMBER_KEY = 'tm_member_id';
+const TM_KAKAO_KEY  = 'tm_kakao_user';
 
 // ── 상수 ─────────────────────────────────────────────
 const EMOJIS_BY_DEST = {
@@ -425,6 +426,91 @@ async function leaveGroup() {
   renderSchedule();
   renderExpenses();
   showToast('그룹을 떠났습니다');
+}
+
+// ══════════════════════════════════════════════════════
+//  카카오 로그인
+// ══════════════════════════════════════════════════════
+async function getOrLoginKakao() {
+  if (!window.Kakao || !Kakao.isInitialized()) {
+    showToast('카카오 SDK 로딩 중입니다. 잠시 후 다시 시도하세요', 'error');
+    return null;
+  }
+  // 같은 세션 내 토큰이 이미 있으면 캐시 반환
+  if (Kakao.Auth.getAccessToken()) {
+    const cached = localStorage.getItem(TM_KAKAO_KEY);
+    if (cached) return JSON.parse(cached);
+  }
+  // 팝업 로그인 시도
+  return new Promise(resolve => {
+    Kakao.Auth.login({
+      success() {
+        Kakao.API.request({
+          url: '/v2/user/me',
+          success(res) {
+            const user = {
+              id: String(res.id),
+              nickname: res.kakao_account?.profile?.nickname || '여행자',
+              profileImage: res.kakao_account?.profile?.profile_image_url || null,
+            };
+            localStorage.setItem(TM_KAKAO_KEY, JSON.stringify(user));
+            renderKakaoProfileBanner(user);
+            resolve(user);
+          },
+          fail() {
+            showToast('카카오 프로필 조회 실패', 'error');
+            resolve(null);
+          }
+        });
+      },
+      fail(e) {
+        if (e?.error !== 'access_denied') showToast('카카오 로그인 실패', 'error');
+        resolve(null);
+      }
+    });
+  });
+}
+
+function kakaoLogout() {
+  if (window.Kakao && Kakao.isInitialized() && Kakao.Auth.getAccessToken()) {
+    Kakao.Auth.logout();
+  }
+  localStorage.removeItem(TM_KAKAO_KEY);
+  renderKakaoProfileBanner(null);
+  showToast('카카오 로그아웃 됐습니다');
+}
+
+function renderKakaoProfileBanner(user) {
+  const el = document.getElementById('kakaoProfileBanner');
+  if (!el) return;
+  if (!user) { el.classList.add('hidden'); return; }
+  const av = user.profileImage
+    ? `<img class="kakao-avatar" src="${user.profileImage}" alt="">`
+    : `<span class="kakao-avatar-fallback">😊</span>`;
+  el.innerHTML = `
+    ${av}
+    <div class="kakao-profile-info">
+      <div class="kakao-profile-hello">카카오 계정</div>
+      <div class="kakao-profile-name">${user.nickname}</div>
+    </div>
+    <button class="kakao-logout-btn" onclick="kakaoLogout()">로그아웃</button>
+  `;
+  el.classList.remove('hidden');
+}
+
+function renderKakaoModalStrip(stripId, user) {
+  const el = document.getElementById(stripId);
+  if (!el || !user) return;
+  const av = user.profileImage
+    ? `<img class="km-avatar" src="${user.profileImage}" alt="">`
+    : `<span class="km-avatar">😊</span>`;
+  el.innerHTML = `
+    <div class="kakao-user-row">
+      ${av}
+      <span class="km-name">${user.nickname}</span>
+      <span class="km-badge">카카오 로그인</span>
+    </div>
+  `;
 }
 
 function shareGroup() {
@@ -1044,8 +1130,20 @@ function bindEvents() {
   });
 
   // 그룹 탭
-  document.getElementById('createGroupBtn').addEventListener('click', () => openModal('create-group'));
-  document.getElementById('joinGroupBtn').addEventListener('click', () => openModal('join-group'));
+  document.getElementById('createGroupBtn').addEventListener('click', async () => {
+    const user = await getOrLoginKakao();
+    if (!user) return;
+    document.getElementById('cgMyName').value = user.nickname;
+    renderKakaoModalStrip('cgKakaoStrip', user);
+    openModal('create-group');
+  });
+  document.getElementById('joinGroupBtn').addEventListener('click', async () => {
+    const user = await getOrLoginKakao();
+    if (!user) return;
+    document.getElementById('jgMyName').value = user.nickname;
+    renderKakaoModalStrip('jgKakaoStrip', user);
+    openModal('join-group');
+  });
   document.getElementById('confirmCreateGroup').addEventListener('click', createGroup);
   document.getElementById('confirmJoinGroup').addEventListener('click', joinGroup);
   document.getElementById('editTripBtn').addEventListener('click', () => {
@@ -1156,7 +1254,15 @@ function bindEvents() {
   const codeFromUrl = urlParams.get('code');
   if (codeFromUrl) {
     document.getElementById('jgCode').value = codeFromUrl.toUpperCase();
-    if (!state.group) openModal('join-group');
+    if (!state.group) {
+      (async () => {
+        const user = await getOrLoginKakao();
+        if (!user) return;
+        document.getElementById('jgMyName').value = user.nickname;
+        renderKakaoModalStrip('jgKakaoStrip', user);
+        openModal('join-group');
+      })();
+    }
   }
 }
 
@@ -1167,6 +1273,10 @@ async function init() {
   if (window.Kakao && !Kakao.isInitialized()) {
     Kakao.init('1ed552a04cbafec60a1206e37ee1bdeb');
   }
+
+  // 이전 세션 Kakao 유저 정보 복원 (로그인 상태 표시용)
+  const cachedKakao = localStorage.getItem(TM_KAKAO_KEY);
+  if (cachedKakao) renderKakaoProfileBanner(JSON.parse(cachedKakao));
 
   bindEvents();
 

@@ -310,6 +310,71 @@ img { max-width: 100%; display: block; }
 .modal-body { padding: 16px 20px; }
 .modal-footer { padding: 0 20px 24px; }
 
+/* ─── Kakao Login ────────────────────────────────────── */
+.kakao-profile-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  width: 100%;
+  max-width: 280px;
+}
+.kakao-profile-banner.hidden { display: none; }
+.kakao-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--border);
+}
+.kakao-avatar-fallback {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--kakao);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.kakao-profile-info { flex: 1; min-width: 0; }
+.kakao-profile-hello { font-size: 11px; color: var(--text-3); }
+.kakao-profile-name {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kakao-logout-btn {
+  font-size: 11px; color: var(--text-3);
+  padding: 4px 8px; border-radius: 20px;
+  border: 1px solid var(--border);
+  background: none; cursor: pointer; flex-shrink: 0;
+  white-space: nowrap;
+}
+.kakao-logout-btn:active { background: var(--bg); }
+
+.kakao-modal-strip { margin-bottom: 4px; }
+.kakao-modal-strip .kakao-user-row {
+  display: flex; align-items: center; gap: 8px;
+  background: #FFFDE7;
+  border: 1px solid #FFF176;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 14px;
+}
+.kakao-modal-strip .km-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+  background: var(--kakao);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.kakao-modal-strip .km-name { font-size: 13px; font-weight: 600; flex: 1; }
+.kakao-modal-strip .km-badge {
+  font-size: 11px; color: #7A5800;
+  background: #FFF59D; border-radius: 20px;
+  padding: 2px 7px;
+}
+
 /* ─── Empty State ────────────────────────────────────── */
 .empty-hero {
   display: flex;
