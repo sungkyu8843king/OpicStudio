@@ -155,7 +155,10 @@ function renderRecSections(data) {
               </div>
               <div class="rec-place-card-desc">${escapeHtml(p.desc || '')}</div>
               ${p.tip ? `<div class="rec-place-card-tip">💡 ${escapeHtml(p.tip)}</div>` : ''}
-              <button class="rec-place-map-btn" onclick="window.open('${mapUrl}','_blank')">🗺️ 지도 검색</button>
+              <div class="rec-place-card-btns">
+                <button class="rec-place-map-btn" onclick="window.open('${mapUrl}','_blank')">🗺️ 지도</button>
+                <button class="rec-place-add-btn" onclick="openAddFromRecModal('${p.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${(p.emoji||'📍')}','${p.category||'attraction'}')">📅 일정 추가</button>
+              </div>
             </div>`;
           }).join('')}
         </div>
@@ -218,4 +221,65 @@ function toggleAISuggest(idx) {
 function togglePackingItem(idx) {
   const label = document.getElementById(`pk-${idx}`);
   if (label) label.classList.toggle('packing-done');
+}
+
+// ── 추천 장소 → 일정 추가 ─────────────────────────────
+function openAddFromRecModal(name, emoji, category) {
+  if (!state.group) { showToast('먼저 그룹을 만드세요', 'error'); return; }
+  if (!state.schedule?.length) { showToast('일정 탭에서 여행 날짜를 먼저 설정하세요', 'error'); return; }
+
+  document.getElementById('afr-place-name').textContent = `${emoji} ${name}`;
+  window._afrPending = { name, category };
+
+  const dayList = document.getElementById('afr-day-list');
+  dayList.innerHTML = state.schedule.map((d, i) => {
+    const places = d.places || [];
+    const sub = places.length > 0
+      ? places.slice(0, 2).map(p => p.name).join(', ') + (places.length > 2 ? ' 외…' : '')
+      : '일정 없음';
+    return `
+      <button class="afr-day-btn" onclick="confirmAddFromRec(${i})">
+        <div class="afr-day-badge">Day ${i + 1}</div>
+        <div class="afr-day-info">
+          <span class="afr-day-date">${formatDate(d.date)}</span>
+          <span class="afr-day-places">${escapeHtml(sub)}</span>
+        </div>
+        <span class="afr-day-arrow">→</span>
+      </button>`;
+  }).join('');
+
+  openModal('add-from-rec');
+}
+
+async function confirmAddFromRec(dayIdx) {
+  const pending = window._afrPending;
+  if (!pending || !state.group) return;
+
+  // AI category → DB type 매핑 (1:1 대응)
+  const typeMap = { restaurant:'restaurant', attraction:'attraction', activity:'activity', cafe:'cafe', shopping:'shopping' };
+  const placeType = typeMap[pending.category] || 'attraction';
+
+  const { error } = await sb.from('trip_places').insert({
+    group_id:  state.group.id,
+    day_index: dayIdx,
+    name:      pending.name,
+    type:      placeType,
+    time:      suggestNextTime(),
+    address:   null,
+    note:      null,
+    lat:       null,
+    lng:       null,
+  });
+
+  if (error) { showToast('추가 실패: ' + error.message, 'error'); return; }
+
+  state.currentDay = dayIdx;
+  await loadGroupData(state.group.id);
+  closeModal('add-from-rec');
+  renderSchedule();
+  showToast(`📅 Day${dayIdx + 1}에 "${pending.name}" 추가됨!`, 'success');
+
+  // 일정 탭으로 이동
+  document.querySelector('.tab-btn[data-tab="schedule"]')?.click();
+  window._afrPending = null;
 }
