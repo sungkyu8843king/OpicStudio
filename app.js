@@ -429,53 +429,80 @@ async function leaveGroup() {
 }
 
 // ══════════════════════════════════════════════════════
-//  카카오 로그인
+//  카카오 로그인 (OAuth implicit flow – 리다이렉트 방식)
 // ══════════════════════════════════════════════════════
-async function getOrLoginKakao() {
-  if (!window.Kakao || !Kakao.isInitialized()) {
-    showToast('카카오 SDK 로딩 중입니다. 잠시 후 다시 시도하세요', 'error');
-    return null;
-  }
-  // 같은 세션 내 토큰이 이미 있으면 캐시 반환
-  if (Kakao.Auth.getAccessToken()) {
-    const cached = localStorage.getItem(TM_KAKAO_KEY);
-    if (cached) return JSON.parse(cached);
-  }
-  // 팝업 로그인 시도
-  return new Promise(resolve => {
-    Kakao.Auth.login({
-      success() {
-        Kakao.API.request({
-          url: '/v2/user/me',
-          success(res) {
-            const user = {
-              id: String(res.id),
-              nickname: res.kakao_account?.profile?.nickname || '여행자',
-              profileImage: res.kakao_account?.profile?.profile_image_url || null,
-            };
-            localStorage.setItem(TM_KAKAO_KEY, JSON.stringify(user));
-            renderKakaoProfileBanner(user);
-            resolve(user);
-          },
-          fail() {
-            showToast('카카오 프로필 조회 실패', 'error');
-            resolve(null);
-          }
-        });
-      },
-      fail(e) {
-        if (e?.error !== 'access_denied') showToast('카카오 로그인 실패', 'error');
-        resolve(null);
-      }
-    });
+const KAKAO_APP_KEY  = '1ed552a04cbafec60a1206e37ee1bdeb';
+const KAKAO_REDIRECT = location.origin + location.pathname.replace(/\/$/, '');
+
+async function getOrLoginKakao(intent) {
+  // 캐시된 사용자 정보가 있으면 즉시 반환
+  const cached = localStorage.getItem(TM_KAKAO_KEY);
+  if (cached) return JSON.parse(cached);
+
+  // intent 저장 후 카카오 OAuth 리다이렉트 (response_type=token → 해시로 복귀)
+  localStorage.setItem('tm_kakao_intent', JSON.stringify(intent || {}));
+  const qs = new URLSearchParams({
+    client_id: KAKAO_APP_KEY,
+    redirect_uri: KAKAO_REDIRECT,
+    response_type: 'token',
   });
+  location.href = `https://kauth.kakao.com/oauth/authorize?${qs}`;
+  return null;
+}
+
+async function handleKakaoCallback() {
+  if (!location.hash.includes('access_token')) return;
+
+  const hp = new URLSearchParams(location.hash.slice(1));
+  const accessToken = hp.get('access_token');
+  if (!accessToken) return;
+
+  // 해시 제거 (뒤로가기 시 재실행 방지)
+  history.replaceState(null, '', location.pathname + location.search);
+
+  try {
+    showToast('카카오 로그인 중...', '');
+    const res = await fetch('https://kapi.kakao.com/v2/user/me', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    const data = await res.json();
+    const user = {
+      id: String(data.id),
+      nickname: data.kakao_account?.profile?.nickname || '여행자',
+      profileImage: data.kakao_account?.profile?.profile_image_url || null,
+      accessToken,
+    };
+    localStorage.setItem(TM_KAKAO_KEY, JSON.stringify(user));
+    if (window.Kakao?.isInitialized()) Kakao.Auth.setAccessToken(accessToken);
+    renderKakaoProfileBanner(user);
+
+    // 저장된 intent 복원
+    const intentStr = localStorage.getItem('tm_kakao_intent');
+    localStorage.removeItem('tm_kakao_intent');
+
+    const intent = intentStr ? JSON.parse(intentStr) : {};
+    if (intent.action === 'create') {
+      document.getElementById('cgMyName').value = user.nickname;
+      renderKakaoModalStrip('cgKakaoStrip', user);
+      openModal('create-group');
+    } else if (intent.action === 'join') {
+      if (intent.inviteCode) document.getElementById('jgCode').value = intent.inviteCode;
+      document.getElementById('jgMyName').value = user.nickname;
+      renderKakaoModalStrip('jgKakaoStrip', user);
+      openModal('join-group');
+    }
+    showToast(`안녕하세요, ${user.nickname}님 👋`, 'success');
+  } catch(e) {
+    showToast('카카오 로그인 처리 중 오류가 발생했습니다', 'error');
+  }
 }
 
 function kakaoLogout() {
-  if (window.Kakao && Kakao.isInitialized() && Kakao.Auth.getAccessToken()) {
+  if (window.Kakao?.isInitialized() && Kakao.Auth.getAccessToken()) {
     Kakao.Auth.logout();
   }
   localStorage.removeItem(TM_KAKAO_KEY);
+  localStorage.removeItem('tm_kakao_intent');
   renderKakaoProfileBanner(null);
   showToast('카카오 로그아웃 됐습니다');
 }
@@ -515,7 +542,7 @@ function renderKakaoModalStrip(stripId, user) {
 
 function shareGroup() {
   if (!state.group) { showToast('먼저 그룹을 만드세요'); return; }
-  const url = `${location.origin}${location.pathname}?code=${state.group.code}`;
+  const url = `${location.origin}${location.pathname}?invite=${state.group.code}`;
   if (navigator.share) {
     navigator.share({ title: state.group.name, text: `트립메이트 초대 코드: ${state.group.code}`, url }).catch(() => {});
   } else {
@@ -526,7 +553,7 @@ function shareGroup() {
 function kakaoShare() {
   if (!state.group) return;
   const code = state.group.code;
-  const url = `${location.origin}${location.pathname}?code=${code}`;
+  const url = `${location.origin}${location.pathname}?invite=${code}`;
 
   if (window.Kakao && Kakao.isInitialized()) {
     const dateStr = state.group.start_date
@@ -1131,14 +1158,14 @@ function bindEvents() {
 
   // 그룹 탭
   document.getElementById('createGroupBtn').addEventListener('click', async () => {
-    const user = await getOrLoginKakao();
+    const user = await getOrLoginKakao({ action: 'create' });
     if (!user) return;
     document.getElementById('cgMyName').value = user.nickname;
     renderKakaoModalStrip('cgKakaoStrip', user);
     openModal('create-group');
   });
   document.getElementById('joinGroupBtn').addEventListener('click', async () => {
-    const user = await getOrLoginKakao();
+    const user = await getOrLoginKakao({ action: 'join' });
     if (!user) return;
     document.getElementById('jgMyName').value = user.nickname;
     renderKakaoModalStrip('jgKakaoStrip', user);
@@ -1249,14 +1276,15 @@ function bindEvents() {
   });
   document.getElementById('refreshLocationBtn').addEventListener('click', requestLocation);
 
-  // URL 파라미터 (초대 코드)
+  // URL 파라미터 (초대 링크: ?invite=XXXXXX)
   const urlParams = new URLSearchParams(location.search);
-  const codeFromUrl = urlParams.get('code');
-  if (codeFromUrl) {
-    document.getElementById('jgCode').value = codeFromUrl.toUpperCase();
+  const inviteFromUrl = urlParams.get('invite');
+  if (inviteFromUrl) {
+    const code = inviteFromUrl.toUpperCase();
+    document.getElementById('jgCode').value = code;
     if (!state.group) {
       (async () => {
-        const user = await getOrLoginKakao();
+        const user = await getOrLoginKakao({ action: 'join', inviteCode: code });
         if (!user) return;
         document.getElementById('jgMyName').value = user.nickname;
         renderKakaoModalStrip('jgKakaoStrip', user);
@@ -1271,12 +1299,19 @@ function bindEvents() {
 // ══════════════════════════════════════════════════════
 async function init() {
   if (window.Kakao && !Kakao.isInitialized()) {
-    Kakao.init('1ed552a04cbafec60a1206e37ee1bdeb');
+    Kakao.init(KAKAO_APP_KEY);
   }
 
-  // 이전 세션 Kakao 유저 정보 복원 (로그인 상태 표시용)
+  // 카카오 OAuth 리다이렉트 복귀 처리 (access_token이 URL 해시에 있을 때)
+  await handleKakaoCallback();
+
+  // 이전 세션 Kakao 유저 정보 복원
   const cachedKakao = localStorage.getItem(TM_KAKAO_KEY);
-  if (cachedKakao) renderKakaoProfileBanner(JSON.parse(cachedKakao));
+  if (cachedKakao) {
+    const u = JSON.parse(cachedKakao);
+    renderKakaoProfileBanner(u);
+    if (u.accessToken && window.Kakao?.isInitialized()) Kakao.Auth.setAccessToken(u.accessToken);
+  }
 
   bindEvents();
 
