@@ -415,8 +415,8 @@ async function leaveGroup() {
 
   if (realtimeSub) { realtimeSub.unsubscribe(); realtimeSub = null; }
   clearSession();
-  loadMyTrips();
   showToast('그룹을 떠났습니다');
+  await loadMyTrips();
 }
 
 async function removeMember(memberId, memberName) {
