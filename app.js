@@ -18,11 +18,11 @@ const EMOJIS_BY_DEST = {
   대전: '🌳', 수원: '🏯', 인천: '✈️', 광주: '🌸',
 };
 const TYPE_EMOJI = {
-  attraction: '🏛️', accommodation: '🏨', restaurant: '🍽️',
+  attraction: '🏛️', activity: '🎯', accommodation: '🏨', restaurant: '🍽️',
   cafe: '☕', transport: '🚌', shopping: '🛍️', other: '📍',
 };
 const TYPE_LABEL = {
-  attraction: '관광지', accommodation: '숙소', restaurant: '식당',
+  attraction: '관광지', activity: '놀거리', accommodation: '숙소', restaurant: '식당',
   cafe: '카페', transport: '교통', shopping: '쇼핑', other: '기타',
 };
 const CAT_EMOJI = {
@@ -899,113 +899,172 @@ function openNavApp(app, lat, lng, name) {
 }
 
 // ══════════════════════════════════════════════════════
-//  지도 탭 (Leaflet)
+//  지도 탭 (Kakao Maps)
 // ══════════════════════════════════════════════════════
 let mapInstance = null;
-let mapMarkersLayer = null;
-let routeLayer = null;
-let myLocMarker = null;
+let _mapOverlays = [];
+let _routePolylines = [];
+let myLocOverlay = null;
+let _infoOverlay = null;
 
-function initMap() {
-  if (mapInstance) {
-    setTimeout(() => mapInstance.invalidateSize(), 100);
-    refreshMapMarkers();
-    return;
-  }
-
-  mapInstance = L.map('leafletMap', {
-    center: getMapCenter(),
-    zoom: 12,
-    zoomControl: true,
-  });
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 19,
-  }).addTo(mapInstance);
-
-  mapMarkersLayer = L.layerGroup().addTo(mapInstance);
-  routeLayer = L.layerGroup().addTo(mapInstance);
-
-  refreshMapMarkers();
-  requestLocation();
+function pinColorByType(type) {
+  const colors = { attraction:'#FF6B35', activity:'#FF9500', accommodation:'#3A86FF', restaurant:'#FF6B6B', cafe:'#A98467', transport:'#4ECDC4', shopping:'#C77DFF', other:'#718096' };
+  return colors[type] || '#FF6B35';
 }
 
 function getMapCenter() {
   for (const day of state.schedule) {
     for (const p of day.places) {
-      if (p.lat && p.lng) return [p.lat, p.lng];
+      if (p.lat && p.lng) return new kakao.maps.LatLng(p.lat, p.lng);
     }
   }
-  return [36.5, 127.8];
+  return new kakao.maps.LatLng(36.5, 127.8);
 }
 
-function refreshMapMarkers() {
+async function initMap() {
+  await ensureKakaoMaps();
+  const container = document.getElementById('kakaoMap');
+  if (mapInstance) {
+    kakao.maps.event.trigger(mapInstance, 'resize');
+    refreshMapMarkers();
+    return;
+  }
+  mapInstance = new kakao.maps.Map(container, {
+    center: getMapCenter(),
+    level: 7,
+  });
+  refreshMapMarkers();
+  requestLocation();
+}
+
+function clearMapOverlays() {
+  _mapOverlays.forEach(o => o.setMap(null));
+  _mapOverlays = [];
+  _routePolylines.forEach(p => p.setMap(null));
+  _routePolylines = [];
+  if (_infoOverlay) { _infoOverlay.setMap(null); _infoOverlay = null; }
+}
+
+async function refreshMapMarkers() {
   if (!mapInstance) return;
-  mapMarkersLayer.clearLayers();
-  routeLayer.clearLayers();
+  clearMapOverlays();
 
   const activeLayer = document.querySelector('.map-layer-btn.active')?.dataset.layer || 'all';
-  const coordPairs = [];
+  const allPlaces = [];
 
   if (activeLayer === 'all' || activeLayer === 'places') {
+    let seq = 0;
     state.schedule.forEach((day, di) => {
       day.places.forEach(place => {
         if (!place.lat || !place.lng) return;
-        coordPairs.push([place.lat, place.lng]);
+        seq++;
+        allPlaces.push({ ...place, seq, di });
 
-        const icon = L.divIcon({
-          html: `<div style="background:${pinColorByType(place.type)};color:#fff;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.3);border:3px solid #fff">${TYPE_EMOJI[place.type]}</div>`,
-          iconSize: [36, 36],
-          className: '',
+        const color = pinColorByType(place.type);
+        const node = document.createElement('div');
+        node.style.cssText = `position:relative;width:40px;height:40px;cursor:pointer`;
+        node.innerHTML = `
+          <div style="background:${color};color:#fff;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:15px;box-shadow:0 2px 10px rgba(0,0,0,.3);border:3px solid #fff">${TYPE_EMOJI[place.type]}</div>
+          <div style="position:absolute;top:-6px;right:-6px;background:#222;color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;border:2px solid #fff;padding:0 3px">${seq}</div>`;
+
+        const overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(place.lat, place.lng),
+          content: node,
+          yAnchor: 0.5,
         });
+        overlay.setMap(mapInstance);
+        _mapOverlays.push(overlay);
 
-        L.marker([place.lat, place.lng], { icon })
-          .bindPopup(`
-            <span class="popup-title">${place.name}</span>
-            <span class="popup-sub">${TYPE_LABEL[place.type]} · Day ${di+1} ${place.time || ''}</span>
+        node.addEventListener('click', () => {
+          if (_infoOverlay) { _infoOverlay.setMap(null); _infoOverlay = null; }
+          const info = document.createElement('div');
+          info.className = 'kmap-popup';
+          info.innerHTML = `
+            <button class="kmap-popup-close" id="kpClose">✕</button>
+            <div class="kmap-popup-title">${escapeHtml(place.name)}</div>
+            <div class="kmap-popup-sub">${TYPE_LABEL[place.type]} · Day ${di+1}${place.time ? ' ' + place.time : ''}</div>
             <div class="popup-nav-row">
               <button class="popup-nav-btn" onclick="openNavForPlace(${place.lat},${place.lng},'${encodeURIComponent(place.name)}','kakao')">카카오</button>
               <button class="popup-nav-btn" onclick="openNavForPlace(${place.lat},${place.lng},'${encodeURIComponent(place.name)}','naver')">네이버</button>
               <button class="popup-nav-btn" onclick="openNavForPlace(${place.lat},${place.lng},'${encodeURIComponent(place.name)}','tmap')">T맵</button>
-            </div>
-          `, { maxWidth: 220 })
-          .addTo(mapMarkersLayer);
+            </div>`;
+          _infoOverlay = new kakao.maps.CustomOverlay({
+            position: new kakao.maps.LatLng(place.lat, place.lng),
+            content: info,
+            yAnchor: 1.3,
+            zIndex: 10,
+          });
+          _infoOverlay.setMap(mapInstance);
+          setTimeout(() => {
+            document.getElementById('kpClose')?.addEventListener('click', () => {
+              _infoOverlay?.setMap(null); _infoOverlay = null;
+            });
+          }, 0);
+        });
       });
     });
   }
 
-  if ((activeLayer === 'all' || activeLayer === 'route') && coordPairs.length > 1) {
-    L.polyline(coordPairs, { color: '#FF6B35', weight: 3, opacity: .7, dashArray: '8,6' })
-      .addTo(routeLayer);
-  }
-
-  if ((activeLayer === 'all' || activeLayer === 'members') && state.group) {
-    state.group.members.forEach((m, i) => {
-      const base = coordPairs[0] || [36.5, 127.8];
-      const jitter = (seed) => (((seed * 9301 + 49297) % 233280) / 233280 - 0.5) * 0.02;
-      const lat = base[0] + jitter(i * 17);
-      const lng = base[1] + jitter(i * 31);
+  if (activeLayer === 'all' || activeLayer === 'members') {
+    const base = allPlaces[0] ? new kakao.maps.LatLng(allPlaces[0].lat, allPlaces[0].lng) : getMapCenter();
+    state.group?.members.forEach((m, i) => {
+      const jitter = s => (((s * 9301 + 49297) % 233280) / 233280 - 0.5) * 0.008;
+      const pos = new kakao.maps.LatLng(base.getLat() + jitter(i*17), base.getLng() + jitter(i*31));
       const color = avatarColor(m.name);
-      const icon = L.divIcon({
-        html: `<div style="background:${color};color:#fff;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">${m.name.slice(0,1)}</div>`,
-        iconSize: [32, 32],
-        className: '',
-      });
-      L.marker([lat, lng], { icon })
-        .bindPopup(`<span class="popup-title">${m.name}</span><span class="popup-sub">${m.isMe ? '나' : '멤버'}</span>`)
-        .addTo(mapMarkersLayer);
+      const node = document.createElement('div');
+      node.style.cssText = `background:${color};color:#fff;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer`;
+      node.textContent = m.name.slice(0,1);
+      const o = new kakao.maps.CustomOverlay({ position: pos, content: node, yAnchor: 0.5 });
+      o.setMap(mapInstance);
+      _mapOverlays.push(o);
     });
   }
 
-  if (coordPairs.length > 0) {
-    mapInstance.fitBounds(coordPairs.length === 1 ? L.latLng(coordPairs[0]).toBounds(1000) : coordPairs, { padding: [40, 40] });
+  if ((activeLayer === 'all' || activeLayer === 'route') && allPlaces.length > 1) {
+    drawRoadRoute(allPlaces);
+  }
+
+  if (allPlaces.length > 0) {
+    const bounds = new kakao.maps.LatLngBounds();
+    allPlaces.forEach(p => bounds.extend(new kakao.maps.LatLng(p.lat, p.lng)));
+    mapInstance.setBounds(bounds, 60);
   }
 }
 
-function pinColorByType(type) {
-  const colors = { attraction:'#FF6B35', accommodation:'#3A86FF', restaurant:'#FF6B6B', cafe:'#A98467', transport:'#4ECDC4', shopping:'#C77DFF', other:'#718096' };
-  return colors[type] || '#FF6B35';
+async function drawRoadRoute(places) {
+  // OSRM 무료 도로 라우팅
+  const coords = places.map(p => `${p.lng},${p.lat}`).join(';');
+  try {
+    const res = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`
+    );
+    const data = await res.json();
+    const geojson = data.routes?.[0]?.geometry;
+    if (!geojson) throw new Error('no route');
+
+    const path = geojson.coordinates.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng));
+    const poly = new kakao.maps.Polyline({
+      path,
+      strokeWeight: 5,
+      strokeColor: '#FF6B35',
+      strokeOpacity: 0.85,
+      strokeStyle: 'solid',
+    });
+    poly.setMap(mapInstance);
+    _routePolylines.push(poly);
+  } catch {
+    // fallback: 직선
+    const path = places.map(p => new kakao.maps.LatLng(p.lat, p.lng));
+    const poly = new kakao.maps.Polyline({
+      path,
+      strokeWeight: 4,
+      strokeColor: '#FF6B35',
+      strokeOpacity: 0.6,
+      strokeStyle: 'shortdot',
+    });
+    poly.setMap(mapInstance);
+    _routePolylines.push(poly);
+  }
 }
 
 function requestLocation() {
@@ -1016,22 +1075,18 @@ function requestLocation() {
       state.userLng = pos.coords.longitude;
       document.getElementById('myLocationText').textContent =
         `위치 확인됨 (${state.userLat.toFixed(4)}, ${state.userLng.toFixed(4)})`;
-
-      if (mapInstance) {
-        if (myLocMarker) myLocMarker.remove();
-        const icon = L.divIcon({
-          html: `<div style="background:#3A86FF;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 6px rgba(58,134,255,.2)"></div>`,
-          iconSize: [16, 16],
-          className: '',
-        });
-        myLocMarker = L.marker([state.userLat, state.userLng], { icon })
-          .bindPopup('<span class="popup-title">내 위치</span>')
-          .addTo(mapInstance);
-      }
+      if (!mapInstance) return;
+      if (myLocOverlay) myLocOverlay.setMap(null);
+      const node = document.createElement('div');
+      node.style.cssText = `width:16px;height:16px;border-radius:50%;background:#3A86FF;border:3px solid #fff;box-shadow:0 0 0 6px rgba(58,134,255,.25)`;
+      myLocOverlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(state.userLat, state.userLng),
+        content: node,
+        yAnchor: 0.5,
+      });
+      myLocOverlay.setMap(mapInstance);
     },
-    () => {
-      document.getElementById('myLocationText').textContent = '위치 접근 거부됨';
-    },
+    () => { document.getElementById('myLocationText').textContent = '위치 접근 거부됨'; },
     { enableHighAccuracy: true }
   );
 }
@@ -1345,7 +1400,7 @@ function bindEvents() {
   });
   document.getElementById('myLocBtn').addEventListener('click', () => {
     requestLocation();
-    if (mapInstance && state.userLat) mapInstance.setView([state.userLat, state.userLng], 15);
+    if (mapInstance && state.userLat) { mapInstance.setCenter(new kakao.maps.LatLng(state.userLat, state.userLng)); mapInstance.setLevel(4); }
   });
   document.getElementById('openNavBtn').addEventListener('click', () => {
     document.getElementById('navSheet').classList.remove('hidden');

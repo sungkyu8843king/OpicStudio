@@ -7,7 +7,6 @@
   <meta name="description" content="단체 여행 일정 관리, 실시간 위치 공유, 경비 정산">
   <title>트립메이트 – 단체 여행 일정 관리</title>
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
@@ -106,7 +105,7 @@
         <button class="map-layer-btn" data-layer="members">멤버</button>
         <button class="map-layer-btn" data-layer="route">경로</button>
       </div>
-      <div id="leafletMap" class="leaflet-map"></div>
+      <div id="kakaoMap" class="leaflet-map"></div>
       <div class="map-fabs">
         <button class="fab sm" id="myLocBtn" title="내 위치">📍</button>
         <button class="fab" id="openNavBtn" title="길찾기 앱">🧭</button>
@@ -436,7 +435,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js" integrity="sha384-TiCUE00h649CAMonG018J2ujOgDKW/kVWlChEuu4jK2vxfAAD0eZxzCKakxg55G4" crossorigin="anonymous"></script>
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=1ed552a04cbafec60a1206e37ee1bdeb&libraries=services&autoload=false"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

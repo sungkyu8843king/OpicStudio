@@ -885,11 +885,26 @@ img { max-width: 100%; display: block; }
 /* ─── Utilities ──────────────────────────────────────── */
 .hidden { display: none !important; }
 
-/* ─── Leaflet overrides ──────────────────────────────── */
-.leaflet-control-attribution { font-size: 10px !important; }
-.leaflet-popup-content-wrapper { border-radius: var(--radius-sm) !important; box-shadow: var(--shadow-md) !important; }
-.leaflet-popup-content { font-size: 13px !important; line-height: 1.5 !important; margin: 10px 14px !important; }
-.popup-nav-row { display: flex; gap: 6px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
+/* ─── Kakao Map popup ────────────────────────────────── */
+.kmap-popup {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+  padding: 14px 16px 12px;
+  min-width: 180px;
+  max-width: 220px;
+  position: relative;
+  font-size: 13px;
+}
+.kmap-popup-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  background: none; border: none;
+  font-size: 14px; color: #aaa; cursor: pointer;
+}
+.kmap-popup-title { font-weight: 700; font-size: 14px; color: #111; margin-bottom: 2px; }
+.kmap-popup-sub { font-size: 12px; color: #888; margin-bottom: 8px; }
+.popup-nav-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 .popup-nav-btn {
   font-size: 11px; font-weight: 600; padding: 4px 8px;
   border-radius: 4px; border: 1px solid var(--border);
