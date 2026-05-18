@@ -441,12 +441,28 @@ function kakaoShare() {
   if (!state.group) return;
   const code = state.group.code;
   const url = `${location.origin}${location.pathname}?code=${code}`;
-  const msg = `[트립메이트] ${state.group.name} 여행에 초대합니다!\n초대 코드: ${code}\n참여 링크: ${url}`;
-  navigator.clipboard.writeText(msg).then(() => {
-    showToast('카카오톡 메시지가 복사됐습니다. 톡에 붙여넣으세요!', 'success');
-  }).catch(() => {
-    showToast(`초대 코드: ${code}`, 'success');
-  });
+
+  if (window.Kakao && Kakao.isInitialized()) {
+    const dateStr = state.group.start_date
+      ? `${formatDate(state.group.start_date)} ~ ${formatDate(state.group.end_date)}`
+      : '일정 미정';
+    Kakao.Share.sendDefault({
+      objectType: 'feed',
+      content: {
+        title: `${state.group.name} 여행에 초대합니다! ✈️`,
+        description: `초대 코드: ${code}  ·  ${state.group.dest || ''}  ${dateStr}`,
+        imageUrl: 'https://tripmate-seven-wine.vercel.app/assets/tripmate-icon-512.png',
+        link: { mobileWebUrl: url, webUrl: url }
+      },
+      buttons: [{ title: '여행 참여하기', link: { mobileWebUrl: url, webUrl: url } }]
+    });
+  } else {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('초대 링크가 복사됐습니다 📋', 'success');
+    }).catch(() => {
+      showToast(`초대 코드: ${code}`, 'success');
+    });
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1148,6 +1164,10 @@ function bindEvents() {
 //  앱 초기화
 // ══════════════════════════════════════════════════════
 async function init() {
+  if (window.Kakao && !Kakao.isInitialized()) {
+    Kakao.init('1ed552a04cbafec60a1206e37ee1bdeb');
+  }
+
   bindEvents();
 
   const groupId = localStorage.getItem(TM_GROUP_KEY);
