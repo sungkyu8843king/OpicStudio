@@ -1383,7 +1383,7 @@ function bindEvents() {
       .then(() => showToast('코드 복사됨 📋', 'success'))
       .catch(() => showToast('코드: ' + state.group.code));
   });
-  document.getElementById('addMemberBtn').addEventListener('click', () => openModal('join-group'));
+
 
   // 일정 탭
   document.getElementById('apDay').addEventListener('change', e => {
