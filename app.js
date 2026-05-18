@@ -1,13 +1,16 @@
 /* ═══════════════════════════════════════════════════════
-   트립메이트 – 단체 여행 일정 관리 앱
-   ─────────────────────────────────────────────────────
-   기능:  그룹 생성/참여 · 카카오톡 초대 · 일정 관리
-          지도(Leaflet) · 실시간 위치 · 경비 정산
-          영수증 업로드 · 맛집 추천
+   트립메이트 – 단체 여행 일정 관리 앱 (Supabase 연동)
    ═══════════════════════════════════════════════════════ */
 
+// ── Supabase ─────────────────────────────────────────
+const SUPABASE_URL = 'https://nmvfffzpkqyzztiobwtt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_22PPW0eCY3Tvy3vZVZYKFw_yCb8cI2f';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const TM_GROUP_KEY = 'tm_group_id';
+const TM_MEMBER_KEY = 'tm_member_id';
+
 // ── 상수 ─────────────────────────────────────────────
-const STORAGE_KEY = 'tripmate_v1';
 const EMOJIS_BY_DEST = {
   제주: '🏝️', 부산: '🌊', 서울: '🏙️', 경주: '🏛️',
   강릉: '🌊', 속초: '🏔️', 여수: '🦀', 전주: '🍱',
@@ -30,7 +33,7 @@ const CAT_LABEL = {
   activity: '액티비티', shopping: '쇼핑', other: '기타',
 };
 
-// ── 한국 주요 장소 검색 DB (Nominatim API 대체 mock) ─
+// ── 한국 주요 장소 검색 DB ─────────────────────────────
 const PLACE_DB = [
   { name: '성산일출봉', addr: '제주 서귀포시 성산읍', lat: 33.4582, lng: 126.9414 },
   { name: '한라산 국립공원', addr: '제주 제주시 한라산로 806', lat: 33.3617, lng: 126.5292 },
@@ -76,7 +79,7 @@ const RESTAURANTS = [
 // ── 앱 상태 ────────────────────────────────────────────
 let state = {
   group: null,
-  schedule: [],       // [{ date, places: [] }]
+  schedule: [],
   expenses: [],
   splitMode: 'person',
   currentDay: 0,
@@ -85,43 +88,84 @@ let state = {
   userLng: null,
   localCat: 'all',
   expenseCat: 'all',
-  pendingPlace: null, // { lat, lng, address } for add-place modal
+  pendingPlace: null,
 };
 
-// ── LocalStorage ───────────────────────────────────────
-function saveState() {
-  try {
-    const saved = {
-      group: state.group,
-      schedule: state.schedule,
-      expenses: state.expenses,
-      splitMode: state.splitMode,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-  } catch (e) {
-    console.warn('저장 실패:', e);
-  }
+// ── 세션 관리 ─────────────────────────────────────────
+function clearSession() {
+  localStorage.removeItem(TM_GROUP_KEY);
+  localStorage.removeItem(TM_MEMBER_KEY);
+  state.group = null;
+  state.schedule = [];
+  state.expenses = [];
 }
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const saved = JSON.parse(raw);
-    state.group    = saved.group    || null;
-    state.schedule = saved.schedule || [];
-    state.expenses = saved.expenses || [];
-    state.splitMode= saved.splitMode || 'person';
-  } catch (e) {
-    console.warn('불러오기 실패:', e);
+async function loadGroupData(groupId) {
+  const [gRes, mRes, pRes, eRes] = await Promise.all([
+    sb.from('trip_groups').select('*').eq('id', groupId).single(),
+    sb.from('trip_members').select('*').eq('group_id', groupId).order('created_at'),
+    sb.from('trip_places').select('*').eq('group_id', groupId).order('day_index').order('created_at'),
+    sb.from('trip_expenses').select('*').eq('group_id', groupId).order('created_at'),
+  ]);
+
+  if (gRes.error || !gRes.data) { clearSession(); return false; }
+
+  const g = gRes.data;
+  const myId = localStorage.getItem(TM_MEMBER_KEY);
+
+  state.group = {
+    id: g.id,
+    name: g.name,
+    dest: g.dest,
+    startDate: g.start_date,
+    endDate: g.end_date,
+    code: g.code,
+    households: g.households,
+    members: (mRes.data || []).map(m => ({
+      id: m.id,
+      name: m.name,
+      isMe: m.id === myId,
+      lastSeen: m.is_online ? '온라인' : '',
+    })),
+  };
+
+  // 일정 배열 재구성
+  const totalDays = g.start_date && g.end_date ? daysBetween(g.start_date, g.end_date) : 1;
+  state.schedule = [];
+  for (let i = 0; i < totalDays; i++) {
+    const date = g.start_date ? addDays(g.start_date, i) : new Date().toISOString().slice(0, 10);
+    state.schedule.push({
+      date,
+      places: (pRes.data || [])
+        .filter(p => p.day_index === i)
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          type: p.type || 'other',
+          time: p.time || '',
+          address: p.address || '',
+          note: p.note || '',
+          lat: p.lat,
+          lng: p.lng,
+        })),
+    });
   }
+
+  state.expenses = (eRes.data || []).map(e => ({
+    id: e.id,
+    name: e.name,
+    amount: Number(e.amount),
+    category: e.category || 'other',
+    payer: e.payer || '',
+    date: e.date || '',
+    note: e.note || '',
+    receipt: e.receipt_url || null,
+  }));
+
+  return true;
 }
 
 // ── 유틸 ──────────────────────────────────────────────
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
 function genCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -220,7 +264,6 @@ function renderGroupTab() {
   const noGroup = document.getElementById('noGroupState');
   const groupState = document.getElementById('groupState');
   const leaveBtn = document.getElementById('leaveGroupBtn');
-  const shareBtn = document.getElementById('shareGroupBtn');
 
   if (!state.group) {
     noGroup.classList.remove('hidden');
@@ -241,7 +284,6 @@ function renderGroupTab() {
   document.getElementById('groupDestText').textContent = g.dest || '목적지 미설정';
   document.getElementById('inviteCodeDisplay').textContent = g.code;
 
-  // 날짜
   if (g.startDate && g.endDate) {
     const n = daysBetween(g.startDate, g.endDate);
     document.getElementById('groupDatesText').textContent =
@@ -250,25 +292,22 @@ function renderGroupTab() {
     document.getElementById('groupDatesText').textContent = '날짜 미설정';
   }
 
-  // 멤버
   const ml = document.getElementById('memberList');
   ml.innerHTML = '';
   document.getElementById('memberBadge').textContent = g.members.length;
   g.members.forEach(m => {
     const li = document.createElement('li');
     li.className = 'member-item';
-    const isMe = m.isMe;
     const bg = avatarColor(m.name);
     li.innerHTML = `
       <div class="member-avatar" style="background:${bg}">${m.name.slice(0, 1)}</div>
       <span class="member-name">${m.name}</span>
-      ${isMe ? '<span class="member-me">나</span>' : ''}
+      ${m.isMe ? '<span class="member-me">나</span>' : ''}
       <span class="member-loc">${m.lastSeen || ''}</span>
     `;
     ml.appendChild(li);
   });
 
-  // 여행 정보
   const infoBlock = document.getElementById('tripInfoBlock');
   const nights = g.startDate && g.endDate ? daysBetween(g.startDate, g.endDate) - 1 : 0;
   infoBlock.innerHTML = `
@@ -279,7 +318,7 @@ function renderGroupTab() {
   `;
 }
 
-function createGroup() {
+async function createGroup() {
   const name = document.getElementById('cgName').value.trim();
   const dest = document.getElementById('cgDest').value.trim();
   const startDate = document.getElementById('cgStart').value;
@@ -292,58 +331,64 @@ function createGroup() {
     showToast('귀환일이 출발일보다 빠릅니다', 'error'); return;
   }
 
-  state.group = {
-    id: uid(), name, dest, startDate, endDate,
-    code: genCode(),
-    members: [{ id: uid(), name: myName, isMe: true, lastSeen: '현재 위치 공유 중' }],
-    households: 1,
-  };
+  showToast('그룹 만드는 중...', '');
 
-  // 일정 초기화
-  if (startDate && endDate) {
-    const days = daysBetween(startDate, endDate);
-    state.schedule = [];
-    for (let i = 0; i < days; i++) {
-      state.schedule.push({ date: addDays(startDate, i), places: [] });
-    }
-  } else {
-    state.schedule = [{ date: new Date().toISOString().slice(0,10), places: [] }];
-  }
+  const { data: grp, error: grpErr } = await sb.from('trip_groups').insert({
+    name, dest: dest || null,
+    start_date: startDate || null, end_date: endDate || null,
+    code: genCode(), households: 1,
+  }).select().single();
 
-  saveState();
+  if (grpErr) { showToast('오류: ' + grpErr.message, 'error'); return; }
+
+  const { data: member, error: mErr } = await sb.from('trip_members').insert({
+    group_id: grp.id, name: myName, is_online: true,
+  }).select().single();
+
+  if (mErr) { showToast('오류: ' + mErr.message, 'error'); return; }
+
+  localStorage.setItem(TM_GROUP_KEY, grp.id);
+  localStorage.setItem(TM_MEMBER_KEY, member.id);
+
+  await loadGroupData(grp.id);
   closeModal('create-group');
   showToast('그룹이 만들어졌습니다! 🎉', 'success');
   renderGroupTab();
   renderSchedule();
+  subscribeRealtime(grp.id);
 }
 
-function joinGroup() {
+async function joinGroup() {
   const code = document.getElementById('jgCode').value.trim().toUpperCase();
   const myName = document.getElementById('jgMyName').value.trim();
 
   if (code.length !== 6) { showToast('6자리 코드를 입력하세요', 'error'); return; }
   if (!myName) { showToast('내 이름을 입력하세요', 'error'); return; }
 
-  if (state.group && state.group.code === code) {
-    // 이미 있는 그룹에 참여 (같은 기기 데모)
-    const exists = state.group.members.find(m => m.name === myName);
-    if (!exists) {
-      state.group.members.forEach(m => m.isMe = false);
-      state.group.members.push({ id: uid(), name: myName, isMe: true, lastSeen: '현재 위치 공유 중' });
-      saveState();
-    }
-    showToast(`${myName}님, 그룹에 합류했습니다!`, 'success');
-  } else {
-    // 데모: 코드가 없으면 새 그룹처럼 생성
-    showToast('코드를 찾을 수 없습니다. (데모: 위 그룹 만들기를 이용하세요)', 'error');
-    return;
-  }
+  showToast('그룹 찾는 중...', '');
 
+  const { data: grp, error } = await sb.from('trip_groups').select('*').eq('code', code).single();
+
+  if (error || !grp) { showToast('코드를 찾을 수 없습니다', 'error'); return; }
+
+  const { data: member, error: mErr } = await sb.from('trip_members').insert({
+    group_id: grp.id, name: myName, is_online: true,
+  }).select().single();
+
+  if (mErr) { showToast('오류: ' + mErr.message, 'error'); return; }
+
+  localStorage.setItem(TM_GROUP_KEY, grp.id);
+  localStorage.setItem(TM_MEMBER_KEY, member.id);
+
+  await loadGroupData(grp.id);
   closeModal('join-group');
+  showToast(`${myName}님, 그룹에 합류했습니다! 🎉`, 'success');
   renderGroupTab();
+  renderSchedule();
+  subscribeRealtime(grp.id);
 }
 
-function editTrip() {
+async function editTrip() {
   if (!state.group) return;
   const name = document.getElementById('etName').value.trim();
   const dest = document.getElementById('etDest').value.trim();
@@ -353,35 +398,29 @@ function editTrip() {
 
   if (!name) { showToast('그룹 이름을 입력하세요', 'error'); return; }
 
-  state.group.name = name;
-  state.group.dest = dest;
-  state.group.households = Math.max(1, households);
+  const { error } = await sb.from('trip_groups').update({
+    name, dest: dest || null,
+    start_date: startDate || null, end_date: endDate || null,
+    households: Math.max(1, households),
+  }).eq('id', state.group.id);
 
-  if (startDate !== state.group.startDate || endDate !== state.group.endDate) {
-    state.group.startDate = startDate;
-    state.group.endDate = endDate;
-    if (startDate && endDate) {
-      const days = daysBetween(startDate, endDate);
-      state.schedule = [];
-      for (let i = 0; i < days; i++) {
-        state.schedule.push({ date: addDays(startDate, i), places: [] });
-      }
-    }
-  }
+  if (error) { showToast('저장 실패', 'error'); return; }
 
-  saveState();
+  await loadGroupData(state.group.id);
   closeModal('edit-trip');
   showToast('저장되었습니다', 'success');
   renderGroupTab();
   renderSchedule();
 }
 
-function leaveGroup() {
-  if (!confirm('그룹에서 나가시겠습니까?\n모든 로컬 데이터가 삭제됩니다.')) return;
-  state.group = null;
-  state.schedule = [];
-  state.expenses = [];
-  saveState();
+async function leaveGroup() {
+  if (!confirm('그룹에서 나가시겠습니까?')) return;
+
+  const myId = localStorage.getItem(TM_MEMBER_KEY);
+  if (myId) await sb.from('trip_members').delete().eq('id', myId);
+
+  if (realtimeSub) { realtimeSub.unsubscribe(); realtimeSub = null; }
+  clearSession();
   renderGroupTab();
   renderSchedule();
   renderExpenses();
@@ -402,7 +441,6 @@ function kakaoShare() {
   if (!state.group) return;
   const code = state.group.code;
   const url = `${location.origin}${location.pathname}?code=${code}`;
-  // 카카오 SDK 없이 clipboard 공유
   const msg = `[트립메이트] ${state.group.name} 여행에 초대합니다!\n초대 코드: ${code}\n참여 링크: ${url}`;
   navigator.clipboard.writeText(msg).then(() => {
     showToast('카카오톡 메시지가 복사됐습니다. 톡에 붙여넣으세요!', 'success');
@@ -434,7 +472,6 @@ function renderSchedule() {
     rangeLabel.textContent = '날짜를 설정하세요';
   }
 
-  // 요일 탭
   dayTabBar.innerHTML = '';
   state.schedule.forEach((day, i) => {
     const btn = document.createElement('button');
@@ -450,7 +487,6 @@ function renderSchedule() {
     dayTabBar.appendChild(btn);
   });
 
-  // 타임라인
   const day = state.schedule[state.currentDay];
   if (!day || day.places.length === 0) {
     timelineWrap.innerHTML = '<div class="empty-schedule"><span>📅</span><p>+ 장소 버튼으로 일정을 추가하세요</p></div>';
@@ -465,9 +501,8 @@ function renderSchedule() {
   sorted.forEach(place => {
     const card = document.createElement('div');
     card.className = 'place-card';
-    const pinClass = 'type-' + place.type;
     card.innerHTML = `
-      <div class="place-pin ${pinClass}">${TYPE_EMOJI[place.type] || '📍'}</div>
+      <div class="place-pin type-${place.type}">${TYPE_EMOJI[place.type] || '📍'}</div>
       <div class="place-info">
         <div class="place-info-top">
           <span class="place-name">${place.name}</span>
@@ -492,7 +527,6 @@ function renderSchedule() {
 function openAddPlaceModal() {
   if (!state.group) { showToast('먼저 그룹을 만드세요', 'error'); return; }
 
-  // 날짜 셀렉트 채우기
   const daySelect = document.getElementById('apDay');
   daySelect.innerHTML = '';
   state.schedule.forEach((day, i) => {
@@ -546,41 +580,41 @@ function searchPlace() {
     };
     container.appendChild(item);
   });
-
-  // 실제 서비스에서는 Kakao/Naver 장소검색 API 호출
 }
 
-function addPlace() {
+async function addPlace() {
   const name = document.getElementById('apName').value.trim();
   if (!name) { showToast('장소 이름을 입력하세요', 'error'); return; }
 
   const dayIdx = parseInt(document.getElementById('apDay').value);
-  const place = {
-    id: uid(),
+
+  const { error } = await sb.from('trip_places').insert({
+    group_id: state.group.id,
+    day_index: dayIdx,
     name,
     type: document.getElementById('apType').value,
-    time: document.getElementById('apTime').value,
-    address: document.getElementById('apAddress').value.trim(),
-    note: document.getElementById('apNote').value.trim(),
+    time: document.getElementById('apTime').value || null,
+    address: document.getElementById('apAddress').value.trim() || null,
+    note: document.getElementById('apNote').value.trim() || null,
     lat: state.pendingPlace?.lat || null,
     lng: state.pendingPlace?.lng || null,
-  };
+  });
 
-  if (!state.schedule[dayIdx]) return;
-  state.schedule[dayIdx].places.push(place);
+  if (error) { showToast('추가 실패: ' + error.message, 'error'); return; }
+
   state.currentDay = dayIdx;
-  saveState();
+  await loadGroupData(state.group.id);
   closeModal('add-place');
   showToast(`${name} 추가됨 ✅`, 'success');
   renderSchedule();
   if (mapInstance) refreshMapMarkers();
 }
 
-function deletePlace(placeId) {
-  state.schedule.forEach(day => {
-    day.places = day.places.filter(p => p.id !== placeId);
-  });
-  saveState();
+async function deletePlace(placeId) {
+  const { error } = await sb.from('trip_places').delete().eq('id', placeId);
+  if (error) { showToast('삭제 실패', 'error'); return; }
+
+  await loadGroupData(state.group.id);
   renderSchedule();
   if (mapInstance) refreshMapMarkers();
   showToast('삭제되었습니다');
@@ -588,8 +622,7 @@ function deletePlace(placeId) {
 
 // ── 지도 앱 딥링크 ─────────────────────────────────────
 function openNavForPlace(lat, lng, encodedName, app) {
-  const name = decodeURIComponent(encodedName);
-  openNavApp(app, lat, lng, name);
+  openNavApp(app, lat, lng, decodeURIComponent(encodedName));
 }
 
 function openNavApp(app, lat, lng, name) {
@@ -615,7 +648,6 @@ let mapInstance = null;
 let mapMarkersLayer = null;
 let routeLayer = null;
 let myLocMarker = null;
-let memberMarkers = [];
 
 function initMap() {
   if (mapInstance) {
@@ -643,13 +675,12 @@ function initMap() {
 }
 
 function getMapCenter() {
-  // 일정의 첫 번째 장소 또는 한국 중심
   for (const day of state.schedule) {
     for (const p of day.places) {
       if (p.lat && p.lng) return [p.lat, p.lng];
     }
   }
-  return [36.5, 127.8]; // 한국 중심
+  return [36.5, 127.8];
 }
 
 function refreshMapMarkers() {
@@ -660,10 +691,9 @@ function refreshMapMarkers() {
   const activeLayer = document.querySelector('.map-layer-btn.active')?.dataset.layer || 'all';
   const coordPairs = [];
 
-  // 장소 마커
   if (activeLayer === 'all' || activeLayer === 'places') {
     state.schedule.forEach((day, di) => {
-      day.places.forEach((place, pi) => {
+      day.places.forEach(place => {
         if (!place.lat || !place.lng) return;
         coordPairs.push([place.lat, place.lng]);
 
@@ -673,7 +703,7 @@ function refreshMapMarkers() {
           className: '',
         });
 
-        const marker = L.marker([place.lat, place.lng], { icon })
+        L.marker([place.lat, place.lng], { icon })
           .bindPopup(`
             <span class="popup-title">${place.name}</span>
             <span class="popup-sub">${TYPE_LABEL[place.type]} · Day ${di+1} ${place.time || ''}</span>
@@ -682,19 +712,17 @@ function refreshMapMarkers() {
               <button class="popup-nav-btn" onclick="openNavForPlace(${place.lat},${place.lng},'${encodeURIComponent(place.name)}','naver')">네이버</button>
               <button class="popup-nav-btn" onclick="openNavForPlace(${place.lat},${place.lng},'${encodeURIComponent(place.name)}','tmap')">T맵</button>
             </div>
-          `, { maxWidth: 220 });
-        mapMarkersLayer.addLayer(marker);
+          `, { maxWidth: 220 })
+          .addTo(mapMarkersLayer);
       });
     });
   }
 
-  // 경로
   if ((activeLayer === 'all' || activeLayer === 'route') && coordPairs.length > 1) {
     L.polyline(coordPairs, { color: '#FF6B35', weight: 3, opacity: .7, dashArray: '8,6' })
       .addTo(routeLayer);
   }
 
-  // 멤버 위치 (시뮬레이션)
   if ((activeLayer === 'all' || activeLayer === 'members') && state.group) {
     state.group.members.forEach((m, i) => {
       const base = coordPairs[0] || [36.5, 127.8];
@@ -744,7 +772,7 @@ function requestLocation() {
           .addTo(mapInstance);
       }
     },
-    err => {
+    () => {
       document.getElementById('myLocationText').textContent = '위치 접근 거부됨';
     },
     { enableHighAccuracy: true }
@@ -760,7 +788,6 @@ function renderExpenses() {
   const houseCount = state.group?.households || 1;
 
   document.getElementById('expenseTotalDisplay').textContent = formatKRW(total);
-  document.getElementById('expenseMemberCount');
 
   const isHousehold = state.splitMode === 'household';
   const divisor = isHousehold ? houseCount : memberCount;
@@ -772,7 +799,6 @@ function renderExpenses() {
     ? `${houseCount}가구 기준`
     : `${memberCount}명 기준`;
 
-  // 리스트
   const list = document.getElementById('expenseList');
   const filtered = state.expenseCat === 'all'
     ? state.expenses
@@ -785,7 +811,7 @@ function renderExpenses() {
 
   list.innerHTML = '';
   [...filtered].reverse().forEach(exp => {
-    const perPerson = memberCount > 0 ? Math.ceil(Number(exp.amount) / divisor) : 0;
+    const perPerson = divisor > 0 ? Math.ceil(Number(exp.amount) / divisor) : 0;
     const item = document.createElement('div');
     item.className = 'expense-item';
     item.innerHTML = `
@@ -794,7 +820,7 @@ function renderExpenses() {
         <div class="expense-name">${exp.name}</div>
         <div class="expense-meta">${CAT_LABEL[exp.category] || '기타'} · ${exp.payer || '미지정'} · ${exp.date || ''}</div>
       </div>
-      ${exp.receipt ? `<img class="expense-receipt-thumb" src="${exp.receipt}" alt="영수증" onclick="viewReceipt('${exp.id}')">` : ''}
+      ${exp.receipt ? `<img class="expense-receipt-thumb" src="${exp.receipt}" alt="영수증">` : ''}
       <div class="expense-right">
         <div class="expense-amount">${formatKRW(exp.amount)}</div>
         <div class="expense-per">${isHousehold ? '가구당' : '1인당'} ${formatKRW(perPerson)}</div>
@@ -816,7 +842,6 @@ function openAddExpenseModal() {
   document.getElementById('receiptThumb').classList.add('hidden');
   document.getElementById('aeDate').value = new Date().toISOString().slice(0,10);
 
-  // 결제자 셀렉트
   const payerSelect = document.getElementById('aePayer');
   payerSelect.innerHTML = '<option value="">선택 안 함</option>';
   state.group.members.forEach(m => {
@@ -830,49 +855,51 @@ function openAddExpenseModal() {
   openModal('add-expense');
 }
 
-function addExpense() {
+async function addExpense() {
   const name = document.getElementById('aeName').value.trim();
   const amount = parseFloat(document.getElementById('aeAmount').value);
 
   if (!name) { showToast('항목명을 입력하세요', 'error'); return; }
   if (!amount || amount <= 0) { showToast('금액을 입력하세요', 'error'); return; }
 
-  const exp = {
-    id: uid(),
-    name,
-    amount,
+  const insertData = {
+    group_id: state.group.id,
+    name, amount,
     category: document.getElementById('aeCat').value,
-    payer: document.getElementById('aePayer').value,
-    date: document.getElementById('aeDate').value,
-    note: document.getElementById('aeNote').value.trim(),
-    receipt: null,
+    payer: document.getElementById('aePayer').value || null,
+    date: document.getElementById('aeDate').value || null,
+    note: document.getElementById('aeNote').value.trim() || null,
+    receipt_url: null,
   };
 
-  // 영수증 이미지
   const fileInput = document.getElementById('aeReceipt');
   if (fileInput.files[0]) {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      exp.receipt = e.target.result;
-      state.expenses.push(exp);
-      saveState();
+    reader.onload = async (e) => {
+      insertData.receipt_url = e.target.result;
+      const { error } = await sb.from('trip_expenses').insert(insertData);
+      if (error) { showToast('추가 실패', 'error'); return; }
+      await loadGroupData(state.group.id);
       closeModal('add-expense');
       showToast(`${name} 추가됨 ✅`, 'success');
       renderExpenses();
     };
     reader.readAsDataURL(fileInput.files[0]);
   } else {
-    state.expenses.push(exp);
-    saveState();
+    const { error } = await sb.from('trip_expenses').insert(insertData);
+    if (error) { showToast('추가 실패', 'error'); return; }
+    await loadGroupData(state.group.id);
     closeModal('add-expense');
     showToast(`${name} 추가됨 ✅`, 'success');
     renderExpenses();
   }
 }
 
-function deleteExpense(id) {
-  state.expenses = state.expenses.filter(e => e.id !== id);
-  saveState();
+async function deleteExpense(id) {
+  const { error } = await sb.from('trip_expenses').delete().eq('id', id);
+  if (error) { showToast('삭제 실패', 'error'); return; }
+
+  await loadGroupData(state.group.id);
   renderExpenses();
   showToast('삭제되었습니다');
 }
@@ -951,15 +978,43 @@ function addRestaurantToSchedule(id) {
 }
 
 // ══════════════════════════════════════════════════════
+//  Realtime 구독
+// ══════════════════════════════════════════════════════
+let realtimeSub = null;
+
+function subscribeRealtime(groupId) {
+  if (realtimeSub) realtimeSub.unsubscribe();
+
+  realtimeSub = sb.channel('tm-' + groupId)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_members', filter: `group_id=eq.${groupId}` }, async () => {
+      await loadGroupData(groupId);
+      renderGroupTab();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_places', filter: `group_id=eq.${groupId}` }, async () => {
+      await loadGroupData(groupId);
+      renderSchedule();
+      if (mapInstance) refreshMapMarkers();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_expenses', filter: `group_id=eq.${groupId}` }, async () => {
+      await loadGroupData(groupId);
+      renderExpenses();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_groups', filter: `id=eq.${groupId}` }, async () => {
+      await loadGroupData(groupId);
+      renderGroupTab();
+      renderSchedule();
+    })
+    .subscribe();
+}
+
+// ══════════════════════════════════════════════════════
 //  이벤트 바인딩
 // ══════════════════════════════════════════════════════
 function bindEvents() {
-  // 탭 전환
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
-  // 모달 닫기
   document.querySelectorAll('.modal-close, [data-close]').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.close || btn.closest('.modal-backdrop').id.replace('modal-', '');
@@ -968,10 +1023,7 @@ function bindEvents() {
   });
   document.querySelectorAll('.modal-backdrop').forEach(bd => {
     bd.addEventListener('click', e => {
-      if (e.target === bd) {
-        const id = bd.id.replace('modal-', '');
-        closeModal(id);
-      }
+      if (e.target === bd) closeModal(bd.id.replace('modal-', ''));
     });
   });
 
@@ -1018,9 +1070,7 @@ function bindEvents() {
   });
   document.getElementById('myLocBtn').addEventListener('click', () => {
     requestLocation();
-    if (mapInstance && state.userLat) {
-      mapInstance.setView([state.userLat, state.userLng], 15);
-    }
+    if (mapInstance && state.userLat) mapInstance.setView([state.userLat, state.userLng], 15);
   });
   document.getElementById('openNavBtn').addEventListener('click', () => {
     document.getElementById('navSheet').classList.remove('hidden');
@@ -1031,10 +1081,9 @@ function bindEvents() {
   document.querySelectorAll('.nav-app-item').forEach(btn => {
     btn.addEventListener('click', () => {
       const app = btn.dataset.app;
-      const lat = state.userLat || (state.schedule[0]?.places[0]?.lat);
-      const lng = state.userLng || (state.schedule[0]?.places[0]?.lng);
-      const name = state.group?.dest || '목적지';
-      openNavApp(app, lat, lng, name);
+      const lat = state.userLat || state.schedule[0]?.places[0]?.lat;
+      const lng = state.userLng || state.schedule[0]?.places[0]?.lng;
+      openNavApp(app, lat, lng, state.group?.dest || '목적지');
       document.getElementById('navSheet').classList.add('hidden');
     });
   });
@@ -1042,7 +1091,6 @@ function bindEvents() {
   // 경비 탭
   document.getElementById('addExpenseBtn').addEventListener('click', openAddExpenseModal);
   document.getElementById('confirmAddExpense').addEventListener('click', addExpense);
-
   document.querySelectorAll('.split-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.split-btn').forEach(b => b.classList.remove('active'));
@@ -1051,7 +1099,6 @@ function bindEvents() {
       renderExpenses();
     });
   });
-
   document.querySelectorAll('[data-ecat]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-ecat]').forEach(b => b.classList.remove('active'));
@@ -1061,7 +1108,6 @@ function bindEvents() {
     });
   });
 
-  // 영수증 파일
   document.getElementById('receiptPickBtn').addEventListener('click', () => {
     document.getElementById('aeReceipt').click();
   });
@@ -1089,7 +1135,7 @@ function bindEvents() {
   });
   document.getElementById('refreshLocationBtn').addEventListener('click', requestLocation);
 
-  // URL 파라미터 처리 (초대 코드)
+  // URL 파라미터 (초대 코드)
   const urlParams = new URLSearchParams(location.search);
   const codeFromUrl = urlParams.get('code');
   if (codeFromUrl) {
@@ -1101,18 +1147,22 @@ function bindEvents() {
 // ══════════════════════════════════════════════════════
 //  앱 초기화
 // ══════════════════════════════════════════════════════
-function init() {
-  loadState();
+async function init() {
   bindEvents();
+
+  const groupId = localStorage.getItem(TM_GROUP_KEY);
+  if (groupId) {
+    showToast('데이터 불러오는 중...', '');
+    const ok = await loadGroupData(groupId);
+    if (ok) {
+      subscribeRealtime(groupId);
+    }
+  }
+
   renderGroupTab();
   renderSchedule();
   renderExpenses();
   renderRestaurants();
-  // 맛집 탭 위치 초기값
-  if (state.userLat) {
-    document.getElementById('myLocationText').textContent =
-      `위치 확인됨 (${state.userLat.toFixed(4)}, ${state.userLng.toFixed(4)})`;
-  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
