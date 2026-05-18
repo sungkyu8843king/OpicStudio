@@ -215,33 +215,58 @@ async function enhanceReceiptImage(file) {
 
 // 합계 키워드 기반 금액 추출
 function extractReceiptAmount(text) {
-  const patterns = [
-    /합\s*계\s*[:\s]*([\d,]+)/,
-    /총\s*합\s*계\s*[:\s]*([\d,]+)/,
-    /결\s*제\s*금\s*액\s*[:\s]*([\d,]+)/,
-    /받\s*을\s*금\s*액\s*[:\s]*([\d,]+)/,
-    /청\s*구\s*금\s*액\s*[:\s]*([\d,]+)/,
-    /총\s*액\s*[:\s]*([\d,]+)/,
-    /소\s*계\s*[:\s]*([\d,]+)/,
-    /TOTAL\s*[:\s]*([\d,]+)/i,
-    /금\s*액\s*[:\s]*([\d,]+)/,
-    /([\d,]+)\s*원/,            // "12,000원" 형식
+  const lines = text.split('\n').map(l => l.trim());
+
+  // ── 1순위: 라인별로 합계 키워드 찾기 (같은 줄 or 다음 줄에서 숫자 추출) ──
+  // "합계금액 21,660원" 또는 "합계금액\n21,660원" 모두 처리
+  const totalKeys = [
+    /합\s*계\s*금\s*액/,   // 합계금액  ← 가장 흔한 카드영수증 형식
+    /총\s*합\s*계/,
+    /결\s*제\s*금\s*액/,
+    /받\s*을\s*금\s*액/,
+    /청\s*구\s*금\s*액/,
+    /합\s*계(?!금)/,        // 합계 (뒤에 '금' 안 오는 경우)
+    /총\s*액/,
+    /TOTAL/i,
+    /소\s*계/,
   ];
-  for (const p of patterns) {
-    const m = text.match(p);
-    if (m) {
-      const n = parseInt(m[1].replace(/,/g, ''));
-      if (n >= 100 && n <= 10000000) return n;
+
+  for (const kw of totalKeys) {
+    for (let i = 0; i < lines.length; i++) {
+      if (!kw.test(lines[i])) continue;
+      // 같은 줄에서 숫자 탐색
+      const sameLine = lines[i].match(/([\d,]+)\s*원?/g);
+      if (sameLine) {
+        for (const s of sameLine) {
+          const n = parseInt(s.replace(/[,원]/g, ''));
+          if (n >= 1000 && n <= 10000000) return n;
+        }
+      }
+      // 다음 1~2줄에서 숫자 탐색
+      for (let j = i + 1; j <= Math.min(i + 2, lines.length - 1); j++) {
+        const m = lines[j].match(/^([\d,]+)\s*원?$/);
+        if (m) {
+          const n = parseInt(m[1].replace(/,/g, ''));
+          if (n >= 1000) return n;
+        }
+      }
     }
   }
-  // 폴백: 4자리 이상 숫자 중 최댓값
+
+  // ── 2순위: "NNNN원" 패턴 전체에서 최댓값 ──
+  const wonNums = [...text.matchAll(/([\d,]+)\s*원/g)]
+    .map(m => parseInt(m[1].replace(/,/g, '')))
+    .filter(n => n >= 1000 && n <= 10000000);
+  if (wonNums.length) return Math.max(...wonNums);
+
+  // ── 폴백: 4자리 이상 숫자 최댓값 ──
   const nums = [...text.matchAll(/[\d,]{4,}/g)]
     .map(m => parseInt(m[0].replace(/,/g, '')))
     .filter(n => n >= 1000 && n <= 10000000);
   return nums.length ? Math.max(...nums) : null;
 }
 
-// 날짜 추출 (YYYY-MM-DD / YY-MM-DD / YYYY.MM.DD 등)
+// 날짜 추출 (YYYY-MM-DD / YY-MM-DD / YYYY.MM.DD / YYYY/MM/DD 등)
 function extractReceiptDate(text) {
   const m4 = text.match(/(\d{4})[.\-\/년](\d{1,2})[.\-\/월](\d{1,2})/);
   if (m4) return `${m4[1]}-${String(m4[2]).padStart(2,'0')}-${String(m4[3]).padStart(2,'0')}`;
@@ -253,13 +278,35 @@ function extractReceiptDate(text) {
   return null;
 }
 
-// 상호명 추출 (첫 의미 있는 줄)
+// 항목명 추출: 상품명 키워드 우선 → 판매자상호 → 첫 의미 줄
 function extractReceiptName(text) {
+  // 1) 상품명 키워드 (카드영수증/온라인 영수증)
+  const prodMatch = text.match(/상\s*품\s*명\s*[\n\s]+([\S][^\n]{1,40})/);
+  if (prodMatch) {
+    const name = prodMatch[1].trim().replace(/\s+/g, ' ');
+    if (name.length >= 2) return name.slice(0, 30);  // 최대 30자
+  }
+
+  // 2) 판매자상호 키워드 (카드영수증)
+  const vendorMatch = text.match(/판\s*매\s*자\s*상\s*호\s*[\n\s]+([\S][^\n]{1,20})/);
+  if (vendorMatch) {
+    const name = vendorMatch[1].trim();
+    if (name.length >= 2) return name;
+  }
+
+  // 3) 가맹점명 / 상호명 키워드
+  const shopMatch = text.match(/(?:가\s*맹\s*점\s*명?|상\s*호\s*명?)\s*[\n\s:]+([가-힣a-zA-Z][^\n]{1,20})/);
+  if (shopMatch) {
+    const name = shopMatch[1].trim();
+    if (name.length >= 2) return name;
+  }
+
+  // 4) 첫 의미 있는 줄 (종이 영수증)
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const skip = /^[\d\s₩,\-\.\/\(\)\*]+$|영수증|RECEIPT|T[Ee][Ll]|F[Aa][Xx]|사업자|등록번호|주\s*소|대표자|e.?mail|www\.|http|^\s*$/i;
-  for (const line of lines.slice(0, 8)) {
-    const cleaned = line.replace(/[^가-힣a-zA-Z0-9\s]/g, '').trim();
-    if (cleaned.length >= 2 && cleaned.length <= 20 && !skip.test(line) && /[가-힣a-zA-Z]/.test(cleaned)) {
+  const skip = /^[\d\s₩,\-\.\/\(\)\*]+$|카드영수증|영수증|RECEIPT|T[Ee][Ll]|F[Aa][Xx]|사업자|등록번호|주\s*소|대표자|e.?mail|www\.|http|결제정보|구매정보|이용상점|거래일시|카드종류|승인번호|할부/i;
+  for (const line of lines.slice(0, 10)) {
+    const cleaned = line.replace(/[^가-힣a-zA-Z0-9\s\(\)]/g, '').trim();
+    if (cleaned.length >= 2 && cleaned.length <= 25 && !skip.test(line) && /[가-힣a-zA-Z]/.test(cleaned)) {
       return cleaned;
     }
   }
