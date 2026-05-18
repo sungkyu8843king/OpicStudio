@@ -516,7 +516,7 @@ async function getOrLoginKakao(intent) {
 async function handleKakaoCallback() {
   const urlParams = new URLSearchParams(location.search);
   const authCode = urlParams.get('code');
-  if (!authCode) return;
+  if (!authCode) return false;
 
   // URL에서 code 파라미터 제거 (뒤로가기 재실행 방지)
   const cleanUrl = new URL(location.href);
@@ -561,9 +561,6 @@ async function handleKakaoCallback() {
     localStorage.setItem(TM_KAKAO_KEY, JSON.stringify(user));
     showToast(`안녕하세요, ${user.nickname}님 👋`, 'success');
 
-    // bindEvents 호출 후 trips 화면으로 이동
-    bindEvents();
-
     // 저장된 intent 복원
     const intentStr = localStorage.getItem('tm_kakao_intent');
     localStorage.removeItem('tm_kakao_intent');
@@ -581,9 +578,11 @@ async function handleKakaoCallback() {
       renderKakaoModalStrip('jgKakaoStrip', user);
       openModal('join-group');
     }
+    return true;
   } catch(e) {
     showToast('카카오 로그인 처리 중 오류가 발생했습니다', 'error');
     console.error(e);
+    return false;
   }
 }
 
@@ -1573,7 +1572,10 @@ async function enterTrip(groupId, memberId) {
 async function init() {
   if (window.Kakao && !Kakao.isInitialized()) Kakao.init(KAKAO_APP_KEY);
 
-  await handleKakaoCallback();
+  bindEvents(); // 항상 먼저 — 로그인 버튼 포함
+
+  const callbackHandled = await handleKakaoCallback();
+  if (callbackHandled) return; // handleKakaoCallback 내부에서 loadMyTrips() 완료
 
   const kakaoUser = JSON.parse(localStorage.getItem(TM_KAKAO_KEY) || 'null');
   if (!kakaoUser) {
@@ -1585,7 +1587,6 @@ async function init() {
     Kakao.Auth.setAccessToken(kakaoUser.accessToken);
   }
 
-  bindEvents();
   await loadMyTrips();
 }
 
