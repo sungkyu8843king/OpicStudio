@@ -429,43 +429,73 @@ async function leaveGroup() {
 }
 
 // ══════════════════════════════════════════════════════
-//  카카오 로그인 (OAuth implicit flow – 리다이렉트 방식)
+//  카카오 로그인 (OAuth authorization code flow)
 // ══════════════════════════════════════════════════════
 const KAKAO_APP_KEY  = '1ed552a04cbafec60a1206e37ee1bdeb';
 const KAKAO_REDIRECT = location.origin + location.pathname.replace(/\/$/, '');
 
 async function getOrLoginKakao(intent) {
-  // 캐시된 사용자 정보가 있으면 즉시 반환
   const cached = localStorage.getItem(TM_KAKAO_KEY);
   if (cached) return JSON.parse(cached);
 
-  // intent 저장 후 카카오 OAuth 리다이렉트 (response_type=token → 해시로 복귀)
   localStorage.setItem('tm_kakao_intent', JSON.stringify(intent || {}));
-  const qs = new URLSearchParams({
-    client_id: KAKAO_APP_KEY,
-    redirect_uri: KAKAO_REDIRECT,
-    response_type: 'token',
-  });
-  location.href = `https://kauth.kakao.com/oauth/authorize?${qs}`;
+  // Kakao JS SDK authorize (response_type=code)
+  if (window.Kakao?.isInitialized()) {
+    Kakao.Auth.authorize({
+      redirectUri: KAKAO_REDIRECT,
+      scope: 'profile_nickname,profile_image',
+    });
+  } else {
+    const qs = new URLSearchParams({
+      client_id: KAKAO_APP_KEY,
+      redirect_uri: KAKAO_REDIRECT,
+      response_type: 'code',
+      scope: 'profile_nickname profile_image',
+    });
+    location.href = `https://kauth.kakao.com/oauth/authorize?${qs}`;
+  }
   return null;
 }
 
 async function handleKakaoCallback() {
-  if (!location.hash.includes('access_token')) return;
+  const urlParams = new URLSearchParams(location.search);
+  const authCode = urlParams.get('code');
+  if (!authCode) return;
 
-  const hp = new URLSearchParams(location.hash.slice(1));
-  const accessToken = hp.get('access_token');
-  if (!accessToken) return;
-
-  // 해시 제거 (뒤로가기 시 재실행 방지)
-  history.replaceState(null, '', location.pathname + location.search);
+  // URL에서 code 파라미터 제거 (뒤로가기 재실행 방지)
+  const cleanUrl = new URL(location.href);
+  cleanUrl.searchParams.delete('code');
+  cleanUrl.searchParams.delete('error');
+  history.replaceState(null, '', cleanUrl.toString());
 
   try {
     showToast('카카오 로그인 중...', '');
-    const res = await fetch('https://kapi.kakao.com/v2/user/me', {
-      headers: { Authorization: `Bearer ${accessToken}` }
+
+    // 인가코드 → 액세스 토큰 교환
+    const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: KAKAO_APP_KEY,
+        redirect_uri: KAKAO_REDIRECT,
+        code: authCode,
+      }),
     });
-    const data = await res.json();
+    const tokenData = await tokenRes.json();
+    if (tokenData.error) {
+      showToast('카카오 토큰 오류: ' + (tokenData.error_description || tokenData.error), 'error');
+      return;
+    }
+
+    const accessToken = tokenData.access_token;
+    if (window.Kakao?.isInitialized()) Kakao.Auth.setAccessToken(accessToken);
+
+    // 사용자 프로필 조회
+    const profileRes = await fetch('https://kapi.kakao.com/v2/user/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await profileRes.json();
     const user = {
       id: String(data.id),
       nickname: data.kakao_account?.profile?.nickname || '여행자',
@@ -473,14 +503,13 @@ async function handleKakaoCallback() {
       accessToken,
     };
     localStorage.setItem(TM_KAKAO_KEY, JSON.stringify(user));
-    if (window.Kakao?.isInitialized()) Kakao.Auth.setAccessToken(accessToken);
     renderKakaoProfileBanner(user);
 
     // 저장된 intent 복원
     const intentStr = localStorage.getItem('tm_kakao_intent');
     localStorage.removeItem('tm_kakao_intent');
-
     const intent = intentStr ? JSON.parse(intentStr) : {};
+
     if (intent.action === 'create') {
       document.getElementById('cgMyName').value = user.nickname;
       renderKakaoModalStrip('cgKakaoStrip', user);
@@ -494,6 +523,7 @@ async function handleKakaoCallback() {
     showToast(`안녕하세요, ${user.nickname}님 👋`, 'success');
   } catch(e) {
     showToast('카카오 로그인 처리 중 오류가 발생했습니다', 'error');
+    console.error(e);
   }
 }
 
