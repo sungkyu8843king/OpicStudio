@@ -763,38 +763,49 @@ function openAddPlaceModal() {
   openModal('add-place');
 }
 
-function searchPlace() {
+async function searchPlace() {
   const query = document.getElementById('apAddress').value.trim();
   if (!query) return;
 
-  const results = PLACE_DB.filter(p =>
-    p.name.includes(query) || p.addr.includes(query)
-  ).slice(0, 5);
-
   const container = document.getElementById('placeSearchResults');
-  container.innerHTML = '';
+  container.innerHTML = '<div class="search-result-item"><span>검색 중...</span></div>';
   container.classList.remove('hidden');
 
-  if (results.length === 0) {
-    container.innerHTML = '<div class="search-result-item"><strong>검색 결과 없음</strong><span>직접 좌표를 입력하거나 이름만 추가하세요</span></div>';
-    return;
-  }
+  try {
+    await ensureKakaoMaps();
+    const places = await new Promise(resolve => {
+      const ps = new kakao.maps.services.Places();
+      ps.keywordSearch(query, (data, status) => {
+        resolve(status === kakao.maps.services.Status.OK ? data.slice(0, 5) : []);
+      });
+    });
 
-  results.forEach(p => {
-    const item = document.createElement('div');
-    item.className = 'search-result-item';
-    item.innerHTML = `<strong>${p.name}</strong><span>${p.addr}</span>`;
-    item.onclick = () => {
-      document.getElementById('apAddress').value = p.addr;
-      document.getElementById('apName').value = document.getElementById('apName').value || p.name;
-      state.pendingPlace = { lat: p.lat, lng: p.lng, address: p.addr };
-      const coords = document.getElementById('apCoords');
-      coords.textContent = `📍 ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`;
-      coords.classList.remove('hidden');
-      container.classList.add('hidden');
-    };
-    container.appendChild(item);
-  });
+    container.innerHTML = '';
+    if (places.length === 0) {
+      container.innerHTML = '<div class="search-result-item"><strong>검색 결과 없음</strong><span>이름만 입력하고 추가하세요</span></div>';
+      return;
+    }
+
+    places.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'search-result-item';
+      item.innerHTML = `<strong>${escapeHtml(p.place_name)}</strong><span>${escapeHtml(p.road_address_name || p.address_name || '')}</span>`;
+      item.onclick = () => {
+        const addr = p.road_address_name || p.address_name || '';
+        document.getElementById('apAddress').value = addr;
+        document.getElementById('apName').value = document.getElementById('apName').value || p.place_name;
+        const lat = parseFloat(p.y), lng = parseFloat(p.x);
+        state.pendingPlace = { lat, lng, address: addr };
+        const coords = document.getElementById('apCoords');
+        coords.textContent = `📍 ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        coords.classList.remove('hidden');
+        container.classList.add('hidden');
+      };
+      container.appendChild(item);
+    });
+  } catch {
+    container.innerHTML = '<div class="search-result-item"><strong>검색 오류</strong><span>잠시 후 다시 시도하세요</span></div>';
+  }
 }
 
 async function addPlace() {
