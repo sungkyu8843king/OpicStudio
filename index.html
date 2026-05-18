@@ -522,7 +522,19 @@
     </div>
     <div class="modal-body">
       <div class="afr-place-name" id="afr-place-name"></div>
-      <p class="afr-label">어느 날 일정에 추가할까요?</p>
+
+      <!-- 위치 검색 결과 -->
+      <div class="afr-section-label">📍 위치 확인</div>
+      <div id="afrLocationResults" class="afr-location-results">
+        <div class="afr-loading">검색 중...</div>
+      </div>
+
+      <!-- 방문 시간 -->
+      <div class="afr-section-label">⏰ 방문 시간</div>
+      <input type="time" id="afrTime" class="afr-time-input" value="10:00">
+
+      <!-- Day 선택 -->
+      <div class="afr-section-label">📅 날짜 선택</div>
       <div class="afr-day-list" id="afr-day-list"></div>
     </div>
   </div>

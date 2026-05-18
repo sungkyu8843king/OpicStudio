@@ -224,17 +224,31 @@ function togglePackingItem(idx) {
 }
 
 // ── 추천 장소 → 일정 추가 ─────────────────────────────
+let _afrPending  = null;   // { name, category, selectedPlace }
+let _afrPlaces   = [];     // Kakao 검색 결과 캐시
+
 function openAddFromRecModal(name, emoji, category) {
-  if (!state.group) { showToast('먼저 그룹을 만드세요', 'error'); return; }
+  if (!state.group)          { showToast('먼저 그룹을 만드세요', 'error'); return; }
   if (!state.schedule?.length) { showToast('일정 탭에서 여행 날짜를 먼저 설정하세요', 'error'); return; }
 
-  document.getElementById('afr-place-name').textContent = `${emoji} ${name}`;
-  window._afrPending = { name, category };
+  _afrPending  = { name, category, selectedPlace: null };
+  _afrPlaces   = [];
 
+  document.getElementById('afr-place-name').textContent = `${emoji} ${name}`;
+
+  // 시간 기본값
+  const timeEl = document.getElementById('afrTime');
+  if (timeEl) timeEl.value = suggestNextTime();
+
+  // 위치 결과 초기화
+  const resultsEl = document.getElementById('afrLocationResults');
+  if (resultsEl) resultsEl.innerHTML = '<div class="afr-loading">🔍 위치 검색 중...</div>';
+
+  // Day 목록
   const dayList = document.getElementById('afr-day-list');
   dayList.innerHTML = state.schedule.map((d, i) => {
     const places = d.places || [];
-    const sub = places.length > 0
+    const sub = places.length
       ? places.slice(0, 2).map(p => p.name).join(', ') + (places.length > 2 ? ' 외…' : '')
       : '일정 없음';
     return `
@@ -249,26 +263,82 @@ function openAddFromRecModal(name, emoji, category) {
   }).join('');
 
   openModal('add-from-rec');
+
+  // Kakao 장소 검색 (비동기, 모달 열린 후 실행)
+  _searchAfrLocation(name, resultsEl);
+}
+
+async function _searchAfrLocation(name, resultsEl) {
+  if (!resultsEl) return;
+  try {
+    await ensureKakaoMaps();
+    const ps = new kakao.maps.services.Places();
+    const places = await new Promise(resolve => {
+      ps.keywordSearch(name, (data, status) =>
+        resolve(status === kakao.maps.services.Status.OK ? data.slice(0, 4) : []),
+        { size: 4 }
+      );
+    });
+
+    if (!places.length) {
+      resultsEl.innerHTML = '<div class="afr-no-location">⚠️ 위치를 찾지 못했습니다. 이름만으로 추가됩니다.</div>';
+      return;
+    }
+
+    _afrPlaces = places;
+    _selectAfrLocation(0);   // 첫 번째 자동 선택
+
+    resultsEl.innerHTML = places.map((p, i) => `
+      <div class="afr-loc-item${i === 0 ? ' selected' : ''}" id="afr-loc-${i}" onclick="_selectAfrLocation(${i})">
+        <span class="afr-loc-radio">${i === 0 ? '✔' : ''}</span>
+        <div class="afr-loc-info">
+          <span class="afr-loc-name">${escapeHtml(p.place_name)}</span>
+          <span class="afr-loc-addr">${escapeHtml(p.road_address_name || p.address_name || '')}</span>
+        </div>
+      </div>`).join('');
+
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="afr-no-location">⚠️ 위치 검색 실패. 이름만으로 추가됩니다.</div>';
+    console.error('[afr search]', e);
+  }
+}
+
+function _selectAfrLocation(idx) {
+  const p = _afrPlaces[idx];
+  if (!p) return;
+  _afrPending.selectedPlace = {
+    name:    p.place_name,
+    address: p.road_address_name || p.address_name || '',
+    lat:     parseFloat(p.y),
+    lng:     parseFloat(p.x),
+  };
+  // UI 선택 상태 갱신
+  document.querySelectorAll('.afr-loc-item').forEach((el, i) => {
+    el.classList.toggle('selected', i === idx);
+    const radio = el.querySelector('.afr-loc-radio');
+    if (radio) radio.textContent = i === idx ? '✔' : '';
+  });
 }
 
 async function confirmAddFromRec(dayIdx) {
-  const pending = window._afrPending;
+  const pending = _afrPending;
   if (!pending || !state.group) return;
 
-  // AI category → DB type 매핑 (1:1 대응)
   const typeMap = { restaurant:'restaurant', attraction:'attraction', activity:'activity', cafe:'cafe', shopping:'shopping' };
   const placeType = typeMap[pending.category] || 'attraction';
+  const time = document.getElementById('afrTime')?.value || suggestNextTime();
+  const loc  = pending.selectedPlace;
 
   const { error } = await sb.from('trip_places').insert({
     group_id:  state.group.id,
     day_index: dayIdx,
-    name:      pending.name,
+    name:      loc?.name    || pending.name,
     type:      placeType,
-    time:      suggestNextTime(),
-    address:   null,
+    time,
+    address:   loc?.address || null,
     note:      null,
-    lat:       null,
-    lng:       null,
+    lat:       loc?.lat     || null,
+    lng:       loc?.lng     || null,
   });
 
   if (error) { showToast('추가 실패: ' + error.message, 'error'); return; }
@@ -277,9 +347,9 @@ async function confirmAddFromRec(dayIdx) {
   await loadGroupData(state.group.id);
   closeModal('add-from-rec');
   renderSchedule();
-  showToast(`📅 Day${dayIdx + 1}에 "${pending.name}" 추가됨!`, 'success');
-
-  // 일정 탭으로 이동
+  if (mapInstance) refreshMapMarkers();
+  const displayName = loc?.name || pending.name;
+  showToast(`📅 Day${dayIdx + 1}에 "${displayName}" 추가됨!`, 'success');
   document.querySelector('.tab-btn[data-tab="schedule"]')?.click();
-  window._afrPending = null;
+  _afrPending = null;
 }

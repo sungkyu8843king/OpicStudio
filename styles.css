@@ -1299,21 +1299,60 @@ img { max-width: 100%; display: block; }
 .rec-place-add-btn:hover { background: #fff4ef; }
 
 /* ── 일정 추가 모달 ── */
-.modal-afr { max-width: 400px; }
+.modal-afr { max-width: 420px; }
 .afr-place-name {
   font-size: 16px; font-weight: 700;
   text-align: center; padding: 4px 0 14px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 14px;
 }
-.afr-label {
-  font-size: 13px; color: var(--text-3);
-  text-align: center; margin: 0 0 12px;
+/* 섹션 소제목 */
+.afr-section-label {
+  font-size: 12px; font-weight: 700; color: var(--text-3);
+  margin: 14px 0 6px;
+  text-transform: uppercase; letter-spacing: .4px;
 }
-.afr-day-list { display: flex; flex-direction: column; gap: 8px; }
+/* 위치 검색 결과 */
+.afr-location-results {
+  display: flex; flex-direction: column; gap: 5px;
+  max-height: 160px; overflow-y: auto;
+}
+.afr-loading, .afr-no-location {
+  font-size: 13px; color: var(--text-3);
+  padding: 8px 10px; text-align: center;
+}
+.afr-loc-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.afr-loc-item:hover  { border-color: var(--primary); background: #fff8f5; }
+.afr-loc-item.selected { border-color: var(--primary); background: #fff4ef; }
+.afr-loc-radio {
+  width: 18px; height: 18px; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-size: 13px; color: var(--primary); font-weight: 800;
+  margin-top: 1px;
+}
+.afr-loc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.afr-loc-name { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.afr-loc-addr { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 시간 입력 */
+.afr-time-input {
+  width: 100%; padding: 9px 12px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 600; color: var(--text-1);
+  background: var(--bg);
+}
+.afr-time-input:focus { border-color: var(--primary); outline: none; }
+/* Day 선택 */
+.afr-day-list { display: flex; flex-direction: column; gap: 8px; margin-top: 0; }
 .afr-day-btn {
   display: flex; align-items: center; gap: 12px;
-  width: 100%; padding: 12px 14px;
+  width: 100%; padding: 11px 14px;
   background: var(--bg);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
