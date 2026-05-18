@@ -125,56 +125,126 @@ async function deleteExpense(id) {
   showToast('삭제되었습니다');
 }
 
-// ── 영수증 OCR (Tesseract.js) ────────────────────────
+// ── 영수증 OCR: Claude AI 우선 → Tesseract 폴백 ──────
 async function runReceiptOCR(imageFile) {
   const btn = document.getElementById('ocrReceiptBtn');
-  if (btn) { btn.textContent = '인식 중... 🔍'; btn.disabled = true; }
-  showToast('영수증 분석 중...', '');
+  if (btn) { btn.textContent = 'AI 분석 중... 🤖'; btn.disabled = true; }
+  showToast('영수증 AI 분석 중...', '');
 
   try {
-    // 이미지 전처리: 업스케일 + 그레이스케일 + 대비 강화 → 인식률 향상
-    const enhanced = await enhanceReceiptImage(imageFile);
+    // ① Claude API 시도 (Vercel 서버리스 함수)
+    const aiResult = await tryClaudeOCR(imageFile);
 
-    const { data } = await Tesseract.recognize(enhanced, 'kor+eng', {
-      tessedit_pageseg_mode: '6',   // 단일 균일 블록 (영수증에 최적)
-      preserve_interword_spaces: '1',
-    });
-    const text = data.text;
-
-    // ① 금액 추출 (합계 키워드 우선 → 폴백: 최대값)
-    const amount = extractReceiptAmount(text);
-    // ② 날짜 추출
-    const date = extractReceiptDate(text);
-    // ③ 항목명 추출 (상호명)
-    const name = extractReceiptName(text);
-
-    if (amount) {
-      document.getElementById('aeAmount').value = amount;
-    }
-    if (date) {
-      document.getElementById('aeDate').value = date;
-    }
-    if (name) {
-      const nameEl = document.getElementById('aeName');
-      if (!nameEl.value) nameEl.value = name;
+    if (aiResult) {
+      applyOCRResult(aiResult);
+      const parts = [];
+      if (aiResult.name)   parts.push(aiResult.name);
+      if (aiResult.amount) parts.push(`₩${Number(aiResult.amount).toLocaleString()}`);
+      if (aiResult.date)   parts.push(aiResult.date);
+      showToast('🤖 AI 인식 완료: ' + (parts.join(' · ') || '입력 완료'), 'success');
+      return;
     }
 
-    const parts = [];
-    if (name)   parts.push(name);
-    if (amount) parts.push(`₩${Number(amount).toLocaleString()}`);
-    if (date)   parts.push(date);
+    // ② Claude 실패 → Tesseract 폴백
+    if (btn) btn.textContent = 'OCR 인식 중... 🔍';
+    showToast('AI 불가 → 텍스트 인식으로 시도 중...', '');
+    await runTesseractOCR(imageFile);
 
-    if (parts.length) {
-      showToast('인식 완료: ' + parts.join(' · '), 'success');
-    } else {
-      showToast('인식 결과가 없습니다. 직접 입력해주세요', '');
-    }
   } catch (e) {
     showToast('인식 실패. 직접 입력해주세요', 'error');
     console.error('OCR error', e);
   } finally {
     if (btn) { btn.textContent = '📷 영수증 인식'; btn.disabled = false; }
   }
+}
+
+// Claude Vision API 호출 (서버리스 함수 경유)
+async function tryClaudeOCR(imageFile) {
+  try {
+    // 이미지를 1200px 이하로 축소 후 base64 변환 (API 효율)
+    const { base64, type } = await imageToBase64(imageFile, 1200);
+
+    const res = await fetch('/api/ocr-receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64, type }),
+    });
+
+    const data = await res.json();
+    if (data.fallback || !data.ok) return null;   // 서버에 API 키 없음 → 폴백
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// Tesseract OCR (폴백)
+async function runTesseractOCR(imageFile) {
+  const enhanced = await enhanceReceiptImage(imageFile);
+  const { data } = await Tesseract.recognize(enhanced, 'kor+eng', {
+    tessedit_pageseg_mode: '6',
+    preserve_interword_spaces: '1',
+  });
+  const text = data.text;
+
+  const result = {
+    name:   extractReceiptName(text),
+    amount: extractReceiptAmount(text),
+    date:   extractReceiptDate(text),
+    category: null,
+  };
+  applyOCRResult(result);
+
+  const parts = [];
+  if (result.name)   parts.push(result.name);
+  if (result.amount) parts.push(`₩${Number(result.amount).toLocaleString()}`);
+  if (result.date)   parts.push(result.date);
+
+  if (parts.length) showToast('인식 완료: ' + parts.join(' · '), 'success');
+  else showToast('인식 결과가 없습니다. 직접 입력해주세요', '');
+}
+
+// 인식 결과를 폼에 채우기
+function applyOCRResult({ name, amount, date, category }) {
+  if (amount) document.getElementById('aeAmount').value = amount;
+  if (date)   document.getElementById('aeDate').value   = date;
+  if (name) {
+    const el = document.getElementById('aeName');
+    if (!el.value) el.value = name;
+  }
+  if (category) {
+    const catEl = document.getElementById('aeCat');
+    const validCats = ['food','transport','accommodation','activity','shopping','other'];
+    if (catEl && validCats.includes(category)) catEl.value = category;
+  }
+}
+
+// 이미지 → base64 (maxPx로 축소)
+function imageToBase64(file, maxPx = 1200) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const mimeType = file.type || 'image/jpeg';
+      canvas.toBlob(blob => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const base64 = e.target.result.split(',')[1];
+          resolve({ base64, type: mimeType });
+        };
+        reader.readAsDataURL(blob);
+      }, mimeType, 0.9);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
 }
 
 // 이미지 전처리: 업스케일 + 고대비 그레이스케일
