@@ -140,9 +140,6 @@ function bindEvents() {
     requestLocation();
     if (mapInstance && state.userLat) { mapInstance.setCenter(new kakao.maps.LatLng(state.userLat, state.userLng)); mapInstance.setLevel(4); }
   });
-  document.getElementById('openNavBtn').addEventListener('click', () => {
-    document.getElementById('navSheet').classList.remove('hidden');
-  });
   document.getElementById('closeNavSheet').addEventListener('click', () => {
     document.getElementById('navSheet').classList.add('hidden');
   });

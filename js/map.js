@@ -120,20 +120,7 @@ async function refreshMapMarkers() {
     });
   }
 
-  if (activeLayer === 'all' || activeLayer === 'members') {
-    const base = allPlaces[0] ? new kakao.maps.LatLng(allPlaces[0].lat, allPlaces[0].lng) : getMapCenter();
-    state.group?.members.forEach((m, i) => {
-      const jitter = s => (((s * 9301 + 49297) % 233280) / 233280 - 0.5) * 0.008;
-      const pos = new kakao.maps.LatLng(base.getLat() + jitter(i*17), base.getLng() + jitter(i*31));
-      const color = avatarColor(m.name);
-      const node = document.createElement('div');
-      node.style.cssText = `background:${color};color:#fff;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer`;
-      node.textContent = m.name.slice(0,1);
-      const o = new kakao.maps.CustomOverlay({ position: pos, content: node, yAnchor: 0.5 });
-      o.setMap(mapInstance);
-      _mapOverlays.push(o);
-    });
-  }
+  // 멤버 레이어: 실시간 위치 공유 기능 준비 중 (현재 미표시)
 
   // 작업 4: Day별 다색 경로 표시
   if (activeLayer === 'all' || activeLayer === 'route') {
