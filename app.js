@@ -440,16 +440,23 @@ function escapeHtml(str) {
 }
 
 let _destTimer = null;
-async function searchKakaoPlaces(query) {
-  if (!query) return [];
-  try {
-    const res = await fetch(
-      `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=6`,
-      { headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` } }
-    );
-    const data = await res.json();
-    return data.documents || [];
-  } catch { return []; }
+let _kakaoMapsReady = false;
+function ensureKakaoMaps() {
+  if (_kakaoMapsReady) return Promise.resolve();
+  return new Promise(resolve => {
+    kakao.maps.load(() => { _kakaoMapsReady = true; resolve(); });
+  });
+}
+
+function searchKakaoPlaces(query) {
+  if (!query) return Promise.resolve([]);
+  return ensureKakaoMaps().then(() => new Promise(resolve => {
+    const ps = new kakao.maps.services.Places();
+    ps.keywordSearch(query, (data, status) => {
+      if (status === kakao.maps.services.Status.OK) resolve(data.slice(0, 6));
+      else resolve([]);
+    }, { size: 6 });
+  }));
 }
 
 function bindDestInput(inputId, suggestionsId) {

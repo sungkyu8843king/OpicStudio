@@ -226,7 +226,10 @@
       </div>
       <div class="form-group">
         <label for="cgDest">여행지</label>
-        <input id="cgDest" type="text" placeholder="예: 제주도">
+        <div class="dest-wrap">
+          <input id="cgDest" type="text" placeholder="예: 제주도" autocomplete="off">
+          <div class="place-suggestions hidden" id="cgDestSuggestions"></div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -287,7 +290,10 @@
       </div>
       <div class="form-group">
         <label for="etDest">여행지</label>
-        <input id="etDest" type="text" placeholder="예: 제주도">
+        <div class="dest-wrap">
+          <input id="etDest" type="text" placeholder="예: 제주도" autocomplete="off">
+          <div class="place-suggestions hidden" id="etDestSuggestions"></div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -428,6 +434,7 @@
 <!-- Supabase + Kakao + Leaflet + App -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js" integrity="sha384-TiCUE00h649CAMonG018J2ujOgDKW/kVWlChEuu4jK2vxfAAD0eZxzCKakxg55G4" crossorigin="anonymous"></script>
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=1ed552a04cbafec60a1206e37ee1bdeb&libraries=services&autoload=false"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="app.js"></script>
 </body>
