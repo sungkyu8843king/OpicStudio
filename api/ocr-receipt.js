@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
-        max_tokens: 300,
+        max_tokens: 700,
         messages: [{
           role: 'user',
           content: [
@@ -47,7 +47,8 @@ export default async function handler(req, res) {
   "name": "상호명 또는 대표 상품명 (25자 이내)",
   "amount": 최종결제금액숫자,
   "date": "YYYY-MM-DD",
-  "category": "food 또는 transport 또는 accommodation 또는 activity 또는 shopping 또는 other"
+  "category": "food 또는 transport 또는 accommodation 또는 activity 또는 shopping 또는 other",
+  "items": [{"name": "상품명 (30자 이내)", "price": 금액숫자}]
 }
 
 추출 규칙:
@@ -55,6 +56,7 @@ export default async function handler(req, res) {
 - amount: 합계·총결제금액·최종금액 (할인 적용 후 실제 결제액), 숫자만
 - date: 거래일시/주문일자, 없으면 null
 - category: 영수증 내용으로 추정 (식당→food, 교통→transport, 숙박→accommodation 등)
+- items: 개별 구매 항목 목록. 상품이 1개뿐이면 빈 배열 [], 상품이 여러 개면 각각 name과 price 포함. 항목명은 간결하게
 - 값을 알 수 없으면 null`,
             },
           ],
@@ -76,12 +78,23 @@ export default async function handler(req, res) {
 
     const result = JSON.parse(jsonMatch[0]);
 
+    // normalize items: filter out nulls, ensure name/price fields
+    const rawItems = Array.isArray(result.items) ? result.items : [];
+    const items = rawItems
+      .filter(it => it && it.name)
+      .map(it => ({
+        name:  String(it.name).slice(0, 30),
+        price: it.price ? Number(String(it.price).replace(/[^0-9]/g, '')) : null,
+      }))
+      .filter(it => it.name.length >= 1);
+
     return res.json({
       ok: true,
       name:     result.name     || null,
       amount:   result.amount   ? Number(String(result.amount).replace(/[^0-9]/g, '')) : null,
       date:     result.date     || null,
       category: result.category || null,
+      items:    items.length > 1 ? items : [],   // only include if multiple items
     });
   } catch (e) {
     console.error('[ocr-receipt]', e.message);

@@ -1,7 +1,10 @@
 /* ─── js/expense.js ────────────────────────────────────
    renderExpenses, openAddExpenseModal, addExpense,
-   deleteExpense, runReceiptOCR (Tesseract)
+   updateExpense, deleteExpense, openEditExpenseModal,
+   openReceiptModal, runReceiptOCR (Tesseract)
    ──────────────────────────────────────────────────── */
+
+let _editingExpenseId = null;   // null = 추가 모드, id = 수정 모드
 
 function renderExpenses() {
   const total = state.expenses.reduce((s, e) => s + Number(e.amount), 0);
@@ -33,27 +36,83 @@ function renderExpenses() {
   list.innerHTML = '';
   [...filtered].reverse().forEach(exp => {
     const perPerson = divisor > 0 ? Math.ceil(Number(exp.amount) / divisor) : 0;
+
+    // items table (note 필드가 JSON 배열이면 상품 목록)
+    let itemsHtml = '';
+    if (exp.note) {
+      try {
+        const parsed = JSON.parse(exp.note);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          itemsHtml = `<div class="expense-items-table">` +
+            parsed.map(it => `
+              <div class="expense-sub-item">
+                <span class="expense-sub-name">${escapeHtml(it.name || '')}</span>
+                <span class="expense-sub-price">${it.price ? formatKRW(it.price) : ''}</span>
+              </div>`).join('') +
+            `</div>`;
+        }
+      } catch {}
+    }
+
+    // 영수증 footer
+    const safeId   = exp.id.replace(/'/g, "\\'");
+    const safeName = (exp.name || '').replace(/'/g, "\\'");
+    const footerHtml = (exp.receipt || itemsHtml)
+      ? `<div class="expense-footer">
+          ${exp.receipt
+            ? `<button class="expense-receipt-btn" onclick="openReceiptModal('${safeId}')" title="영수증 크게 보기">
+                <img src="${exp.receipt}" alt="영수증">
+               </button>`
+            : '<div></div>'}
+          <div class="expense-actions">
+            <button class="expense-edit-btn" onclick="openEditExpenseModal('${safeId}')">✏️ 수정</button>
+            <button class="expense-del-btn" onclick="deleteExpense('${safeId}','${safeName}')">🗑 삭제</button>
+          </div>
+        </div>`
+      : `<div class="expense-footer expense-footer-simple">
+          <div></div>
+          <div class="expense-actions">
+            <button class="expense-edit-btn" onclick="openEditExpenseModal('${safeId}')">✏️ 수정</button>
+            <button class="expense-del-btn" onclick="deleteExpense('${safeId}','${safeName}')">🗑 삭제</button>
+          </div>
+        </div>`;
+
     const item = document.createElement('div');
     item.className = 'expense-item';
     item.innerHTML = `
-      <div class="expense-cat-icon">${CAT_EMOJI[exp.category] || '📝'}</div>
-      <div class="expense-details">
-        <div class="expense-name">${exp.name}</div>
-        <div class="expense-meta">${CAT_LABEL[exp.category] || '기타'} · ${exp.payer || '미지정'} · ${exp.date || ''}</div>
+      <div class="expense-top">
+        <div class="expense-cat-icon">${CAT_EMOJI[exp.category] || '📝'}</div>
+        <div class="expense-details">
+          <div class="expense-name">${escapeHtml(exp.name)}</div>
+          <div class="expense-meta">${CAT_LABEL[exp.category] || '기타'} · ${escapeHtml(exp.payer || '미지정')} · ${exp.date || ''}</div>
+        </div>
+        <div class="expense-right">
+          <div class="expense-amount">${formatKRW(exp.amount)}</div>
+          <div class="expense-per">${isHousehold ? '가구당' : '1인당'} ${formatKRW(perPerson)}</div>
+        </div>
       </div>
-      ${exp.receipt ? `<img class="expense-receipt-thumb" src="${exp.receipt}" alt="영수증">` : ''}
-      <div class="expense-right">
-        <div class="expense-amount">${formatKRW(exp.amount)}</div>
-        <div class="expense-per">${isHousehold ? '가구당' : '1인당'} ${formatKRW(perPerson)}</div>
-      </div>
-      <button class="expense-del-btn" onclick="deleteExpense('${exp.id}')">🗑</button>
+      ${itemsHtml}
+      ${footerHtml}
     `;
     list.appendChild(item);
   });
 }
 
+// ── 영수증 크게 보기 모달 ──────────────────────────────
+function openReceiptModal(expId) {
+  const exp = state.expenses.find(e => e.id === expId);
+  if (!exp || !exp.receipt) return;
+  document.getElementById('receiptViewImg').src = exp.receipt;
+  openModal('receipt-view');
+}
+
+// ── 경비 추가 모달 열기 ───────────────────────────────
 function openAddExpenseModal() {
   if (!state.group) { showToast('먼저 그룹을 만드세요', 'error'); return; }
+
+  _editingExpenseId = null;
+  document.getElementById('ae-title').textContent = '경비 추가';
+  document.getElementById('confirmAddExpense').textContent = '추가';
 
   document.getElementById('aeName').value = '';
   document.getElementById('aeAmount').value = '';
@@ -62,6 +121,8 @@ function openAddExpenseModal() {
   document.getElementById('receiptThumb').innerHTML = '';
   document.getElementById('receiptThumb').classList.add('hidden');
   document.getElementById('aeDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('aeCat').value = 'food';
+  document.getElementById('aeReceipt').value = '';
 
   const payerSelect = document.getElementById('aePayer');
   payerSelect.innerHTML = '<option value="">선택 안 함</option>';
@@ -76,20 +137,67 @@ function openAddExpenseModal() {
   openModal('add-expense');
 }
 
-async function addExpense() {
-  const name = document.getElementById('aeName').value.trim();
-  const amount = parseFloat(document.getElementById('aeAmount').value);
+// ── 경비 수정 모달 열기 ───────────────────────────────
+function openEditExpenseModal(expId) {
+  const exp = state.expenses.find(e => e.id === expId);
+  if (!exp) return;
 
-  if (!name) { showToast('항목명을 입력하세요', 'error'); return; }
+  _editingExpenseId = expId;
+  document.getElementById('ae-title').textContent = '경비 수정';
+  document.getElementById('confirmAddExpense').textContent = '수정';
+
+  document.getElementById('aeName').value = exp.name || '';
+  document.getElementById('aeAmount').value = exp.amount || '';
+  document.getElementById('aeDate').value = exp.date || '';
+  document.getElementById('aeCat').value = exp.category || 'other';
+  document.getElementById('aeReceipt').value = '';
+
+  // note: JSON 상품목록이면 메모란 비우기 (카드에서 테이블로 표시됨)
+  let noteVal = exp.note || '';
+  try { if (noteVal.startsWith('[')) { JSON.parse(noteVal); noteVal = ''; } } catch {}
+  document.getElementById('aeNote').value = noteVal;
+
+  // 결제자 select
+  const payerSelect = document.getElementById('aePayer');
+  payerSelect.innerHTML = '<option value="">선택 안 함</option>';
+  state.group.members.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name + (m.isMe ? ' (나)' : '');
+    if (m.name === exp.payer) opt.selected = true;
+    payerSelect.appendChild(opt);
+  });
+
+  // 영수증 미리보기
+  const thumb = document.getElementById('receiptThumb');
+  document.getElementById('receiptFileName').textContent = '';
+  if (exp.receipt) {
+    thumb.innerHTML = `<img src="${exp.receipt}" alt="영수증 미리보기" style="max-width:100%;border-radius:6px;">`;
+    thumb.classList.remove('hidden');
+  } else {
+    thumb.innerHTML = '';
+    thumb.classList.add('hidden');
+  }
+
+  openModal('add-expense');
+}
+
+// ── 추가 / 수정 공통 진입점 ───────────────────────────
+async function addExpense() {
+  if (_editingExpenseId) { await _doUpdateExpense(); return; }
+
+  const name   = document.getElementById('aeName').value.trim();
+  const amount = parseFloat(document.getElementById('aeAmount').value);
+  if (!name)            { showToast('항목명을 입력하세요', 'error'); return; }
   if (!amount || amount <= 0) { showToast('금액을 입력하세요', 'error'); return; }
 
   const insertData = {
     group_id: state.group.id,
     name, amount,
-    category: document.getElementById('aeCat').value,
-    payer: document.getElementById('aePayer').value || null,
-    date: document.getElementById('aeDate').value || null,
-    note: document.getElementById('aeNote').value.trim() || null,
+    category:    document.getElementById('aeCat').value,
+    payer:       document.getElementById('aePayer').value || null,
+    date:        document.getElementById('aeDate').value || null,
+    note:        document.getElementById('aeNote').value.trim() || null,
     receipt_url: null,
   };
 
@@ -116,10 +224,59 @@ async function addExpense() {
   }
 }
 
-async function deleteExpense(id) {
+// ── 실제 수정 처리 ────────────────────────────────────
+async function _doUpdateExpense() {
+  const name   = document.getElementById('aeName').value.trim();
+  const amount = parseFloat(document.getElementById('aeAmount').value);
+  if (!name)            { showToast('항목명을 입력하세요', 'error'); return; }
+  if (!amount || amount <= 0) { showToast('금액을 입력하세요', 'error'); return; }
+
+  // 기존 note 보존 여부: 수정 전 exp에 JSON items가 있고 메모란이 비어있으면 기존 note 유지
+  const origExp = state.expenses.find(e => e.id === _editingExpenseId);
+  const memoInput = document.getElementById('aeNote').value.trim();
+  let noteVal = memoInput || null;
+  if (!memoInput && origExp?.note) {
+    try { if (origExp.note.startsWith('[')) { JSON.parse(origExp.note); noteVal = origExp.note; } } catch {}
+  }
+
+  const updateData = {
+    name, amount,
+    category: document.getElementById('aeCat').value,
+    payer:    document.getElementById('aePayer').value || null,
+    date:     document.getElementById('aeDate').value || null,
+    note:     noteVal,
+  };
+
+  const fileInput = document.getElementById('aeReceipt');
+  const expId = _editingExpenseId;
+
+  if (fileInput.files[0]) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      updateData.receipt_url = e.target.result;
+      await _commitUpdate(expId, updateData, name);
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  } else {
+    await _commitUpdate(expId, updateData, name);
+  }
+}
+
+async function _commitUpdate(expId, updateData, name) {
+  const { error } = await sb.from('trip_expenses').update(updateData).eq('id', expId);
+  if (error) { showToast('수정 실패', 'error'); return; }
+  _editingExpenseId = null;
+  await loadGroupData(state.group.id);
+  closeModal('add-expense');
+  showToast(`${name} 수정됨 ✅`, 'success');
+  renderExpenses();
+}
+
+// ── 삭제 (확인 알럿) ──────────────────────────────────
+async function deleteExpense(id, name) {
+  if (!confirm(`"${name || '이 항목'}"을 삭제하시겠습니까?`)) return;
   const { error } = await sb.from('trip_expenses').delete().eq('id', id);
   if (error) { showToast('삭제 실패', 'error'); return; }
-
   await loadGroupData(state.group.id);
   renderExpenses();
   showToast('삭제되었습니다');
@@ -205,7 +362,7 @@ async function runTesseractOCR(imageFile) {
 }
 
 // 인식 결과를 폼에 채우기
-function applyOCRResult({ name, amount, date, category }) {
+function applyOCRResult({ name, amount, date, category, items }) {
   if (amount) document.getElementById('aeAmount').value = amount;
   if (date)   document.getElementById('aeDate').value   = date;
   if (name) {
@@ -216,6 +373,10 @@ function applyOCRResult({ name, amount, date, category }) {
     const catEl = document.getElementById('aeCat');
     const validCats = ['food','transport','accommodation','activity','shopping','other'];
     if (catEl && validCats.includes(category)) catEl.value = category;
+  }
+  // 상품 목록이 여러 개면 note 필드에 JSON으로 저장 (카드에서 표로 표시됨)
+  if (Array.isArray(items) && items.length > 1) {
+    document.getElementById('aeNote').value = JSON.stringify(items);
   }
 }
 

@@ -868,15 +868,20 @@ img { max-width: 100%; display: block; }
 .empty-expense span { font-size: 40px; }
 
 .expense-item {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; flex-direction: column;
   background: var(--card-bg);
   border-radius: var(--radius-sm);
   padding: 12px;
   margin-bottom: 8px;
   box-shadow: var(--shadow-xs);
+  gap: 0;
+}
+/* ── top row: icon + name/meta + amount ── */
+.expense-top {
+  display: flex; align-items: center; gap: 10px;
 }
 .expense-cat-icon {
-  width: 42px; height: 42px;
+  width: 40px; height: 40px;
   border-radius: 12px;
   background: var(--bg);
   font-size: 20px;
@@ -889,13 +894,61 @@ img { max-width: 100%; display: block; }
 .expense-right { text-align: right; flex-shrink: 0; }
 .expense-amount { font-size: 16px; font-weight: 700; color: var(--text); }
 .expense-per { font-size: 11px; color: var(--text-3); }
-.expense-receipt-thumb {
-  width: 40px; height: 40px;
-  border-radius: 6px;
-  object-fit: cover;
-  border: 1px solid var(--border);
+/* ── items table ── */
+.expense-items-table {
+  border-top: 1px solid var(--border);
+  margin-top: 10px; padding-top: 8px;
+  display: flex; flex-direction: column; gap: 4px;
 }
-.expense-del-btn { color: var(--text-3); font-size: 16px; padding: 4px; }
+.expense-sub-item {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 12px; color: var(--text-2);
+}
+.expense-sub-name {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin-right: 10px;
+}
+.expense-sub-price { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--text-3); }
+/* ── footer: receipt thumb + action buttons ── */
+.expense-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  border-top: 1px solid var(--border);
+  margin-top: 10px; padding-top: 8px;
+}
+.expense-footer-simple {
+  margin-top: 8px; padding-top: 6px;
+}
+.expense-receipt-btn {
+  width: 52px; height: 52px;
+  border-radius: 6px; overflow: hidden;
+  border: 1px solid var(--border);
+  padding: 0; background: none; cursor: pointer;
+  flex-shrink: 0;
+}
+.expense-receipt-btn img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.expense-actions { display: flex; gap: 6px; margin-left: auto; }
+.expense-edit-btn {
+  font-size: 12px; padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text-2); cursor: pointer;
+}
+.expense-del-btn {
+  font-size: 12px; padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text-3); cursor: pointer;
+}
+/* ── receipt view modal ── */
+.modal-receipt-view { max-width: 500px; padding: 0; }
+.receipt-view-body {
+  overflow-y: auto; max-height: 72vh;
+  display: flex; justify-content: center; background: #000;
+}
+.receipt-view-body img { max-width: 100%; display: block; }
 
 .expense-fab {
   position: fixed;
