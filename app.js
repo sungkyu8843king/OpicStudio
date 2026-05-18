@@ -262,20 +262,17 @@ function switchTab(tab) {
 //  그룹 탭
 // ══════════════════════════════════════════════════════
 function renderGroupTab() {
-  const noGroup = document.getElementById('noGroupState');
   const groupState = document.getElementById('groupState');
   const leaveBtn = document.getElementById('leaveGroupBtn');
 
   if (!state.group) {
-    noGroup.classList.remove('hidden');
-    groupState.classList.add('hidden');
+    if (groupState) groupState.classList.add('hidden');
     leaveBtn.style.display = 'none';
     document.getElementById('appBarTitle').textContent = '트립메이트';
     return;
   }
 
-  noGroup.classList.add('hidden');
-  groupState.classList.remove('hidden');
+  if (groupState) groupState.classList.remove('hidden');
   leaveBtn.style.display = '';
 
   const g = state.group;
@@ -342,21 +339,17 @@ async function createGroup() {
 
   if (grpErr) { showToast('오류: ' + grpErr.message, 'error'); return; }
 
+  const kakaoUser = JSON.parse(localStorage.getItem(TM_KAKAO_KEY) || 'null');
   const { data: member, error: mErr } = await sb.from('trip_members').insert({
     group_id: grp.id, name: myName, is_online: true,
+    kakao_id: kakaoUser?.id || null,
   }).select().single();
 
   if (mErr) { showToast('오류: ' + mErr.message, 'error'); return; }
 
-  localStorage.setItem(TM_GROUP_KEY, grp.id);
-  localStorage.setItem(TM_MEMBER_KEY, member.id);
-
-  await loadGroupData(grp.id);
   closeModal('create-group');
   showToast('그룹이 만들어졌습니다! 🎉', 'success');
-  renderGroupTab();
-  renderSchedule();
-  subscribeRealtime(grp.id);
+  await enterTrip(grp.id, member.id);
 }
 
 async function joinGroup() {
@@ -369,24 +362,19 @@ async function joinGroup() {
   showToast('그룹 찾는 중...', '');
 
   const { data: grp, error } = await sb.from('trip_groups').select('*').eq('code', code).single();
-
   if (error || !grp) { showToast('코드를 찾을 수 없습니다', 'error'); return; }
 
+  const kakaoUser = JSON.parse(localStorage.getItem(TM_KAKAO_KEY) || 'null');
   const { data: member, error: mErr } = await sb.from('trip_members').insert({
     group_id: grp.id, name: myName, is_online: true,
+    kakao_id: kakaoUser?.id || null,
   }).select().single();
 
   if (mErr) { showToast('오류: ' + mErr.message, 'error'); return; }
 
-  localStorage.setItem(TM_GROUP_KEY, grp.id);
-  localStorage.setItem(TM_MEMBER_KEY, member.id);
-
-  await loadGroupData(grp.id);
   closeModal('join-group');
   showToast(`${myName}님, 그룹에 합류했습니다! 🎉`, 'success');
-  renderGroupTab();
-  renderSchedule();
-  subscribeRealtime(grp.id);
+  await enterTrip(grp.id, member.id);
 }
 
 async function editTrip() {
@@ -571,12 +559,17 @@ async function handleKakaoCallback() {
       accessToken,
     };
     localStorage.setItem(TM_KAKAO_KEY, JSON.stringify(user));
-    renderKakaoProfileBanner(user);
+    showToast(`안녕하세요, ${user.nickname}님 👋`, 'success');
+
+    // bindEvents 호출 후 trips 화면으로 이동
+    bindEvents();
 
     // 저장된 intent 복원
     const intentStr = localStorage.getItem('tm_kakao_intent');
     localStorage.removeItem('tm_kakao_intent');
     const intent = intentStr ? JSON.parse(intentStr) : {};
+
+    await loadMyTrips();
 
     if (intent.action === 'create') {
       document.getElementById('cgMyName').value = user.nickname;
@@ -588,7 +581,6 @@ async function handleKakaoCallback() {
       renderKakaoModalStrip('jgKakaoStrip', user);
       openModal('join-group');
     }
-    showToast(`안녕하세요, ${user.nickname}님 👋`, 'success');
   } catch(e) {
     showToast('카카오 로그인 처리 중 오류가 발생했습니다', 'error');
     console.error(e);
@@ -600,9 +592,12 @@ function kakaoLogout() {
     Kakao.Auth.logout();
   }
   localStorage.removeItem(TM_KAKAO_KEY);
+  localStorage.removeItem(TM_GROUP_KEY);
+  localStorage.removeItem(TM_MEMBER_KEY);
   localStorage.removeItem('tm_kakao_intent');
-  renderKakaoProfileBanner(null);
-  showToast('카카오 로그아웃 됐습니다');
+  state.group = null;
+  showToast('로그아웃 됐습니다');
+  showScreen('screenLogin');
 }
 
 function renderKakaoProfileBanner(user) {
@@ -1323,6 +1318,31 @@ function subscribeRealtime(groupId) {
 //  이벤트 바인딩
 // ══════════════════════════════════════════════════════
 function bindEvents() {
+  // 로그인 화면
+  document.getElementById('loginKakaoBtn')?.addEventListener('click', () => {
+    getOrLoginKakao({ action: 'login' });
+  });
+  // 내 여행 목록 버튼들
+  document.getElementById('tripsLogoutBtn')?.addEventListener('click', kakaoLogout);
+  document.getElementById('tripsCreateBtn')?.addEventListener('click', async () => {
+    const user = JSON.parse(localStorage.getItem(TM_KAKAO_KEY) || 'null');
+    if (!user) return;
+    document.getElementById('cgMyName').value = user.nickname;
+    renderKakaoModalStrip('cgKakaoStrip', user);
+    openModal('create-group');
+  });
+  document.getElementById('tripsJoinBtn')?.addEventListener('click', async () => {
+    const user = JSON.parse(localStorage.getItem(TM_KAKAO_KEY) || 'null');
+    if (!user) return;
+    document.getElementById('jgMyName').value = user.nickname;
+    renderKakaoModalStrip('jgKakaoStrip', user);
+    openModal('join-group');
+  });
+  // 앱 내 뒤로가기
+  document.getElementById('backToTripsBtn')?.addEventListener('click', () => {
+    loadMyTrips();
+  });
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
@@ -1342,20 +1362,6 @@ function bindEvents() {
   });
 
   // 그룹 탭
-  document.getElementById('createGroupBtn').addEventListener('click', async () => {
-    const user = await getOrLoginKakao({ action: 'create' });
-    if (!user) return;
-    document.getElementById('cgMyName').value = user.nickname;
-    renderKakaoModalStrip('cgKakaoStrip', user);
-    openModal('create-group');
-  });
-  document.getElementById('joinGroupBtn').addEventListener('click', async () => {
-    const user = await getOrLoginKakao({ action: 'join' });
-    if (!user) return;
-    document.getElementById('jgMyName').value = user.nickname;
-    renderKakaoModalStrip('jgKakaoStrip', user);
-    openModal('join-group');
-  });
   document.getElementById('confirmCreateGroup').addEventListener('click', createGroup);
   document.getElementById('confirmJoinGroup').addEventListener('click', joinGroup);
   document.getElementById('editTripBtn').addEventListener('click', () => {
@@ -1488,39 +1494,99 @@ function bindEvents() {
 }
 
 // ══════════════════════════════════════════════════════
-//  앱 초기화
+//  화면 전환
 // ══════════════════════════════════════════════════════
-async function init() {
-  if (window.Kakao && !Kakao.isInitialized()) {
-    Kakao.init(KAKAO_APP_KEY);
+function showScreen(id) {
+  ['screenLogin', 'screenTrips', 'app'].forEach(s => {
+    document.getElementById(s)?.classList.toggle('hidden', s !== id);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  내 여행 목록
+// ══════════════════════════════════════════════════════
+async function loadMyTrips() {
+  const kakaoUser = JSON.parse(localStorage.getItem(TM_KAKAO_KEY) || 'null');
+  if (!kakaoUser) return;
+
+  // 프로필 표시
+  const profileEl = document.getElementById('tripsProfile');
+  if (profileEl) {
+    profileEl.innerHTML = kakaoUser.profileImage
+      ? `<img src="${kakaoUser.profileImage}" class="trips-avatar"><span class="trips-username">${escapeHtml(kakaoUser.nickname)}</span>`
+      : `<div class="trips-avatar-text">${escapeHtml(kakaoUser.nickname.slice(0,1))}</div><span class="trips-username">${escapeHtml(kakaoUser.nickname)}</span>`;
   }
 
-  // 카카오 OAuth 리다이렉트 복귀 처리 (access_token이 URL 해시에 있을 때)
-  await handleKakaoCallback();
+  const { data: memberships } = await sb
+    .from('trip_members')
+    .select('id, group_id, name, trip_groups(*)')
+    .eq('kakao_id', kakaoUser.id)
+    .order('created_at', { ascending: false });
 
-  // 이전 세션 Kakao 유저 정보 복원
-  const cachedKakao = localStorage.getItem(TM_KAKAO_KEY);
-  if (cachedKakao) {
-    const u = JSON.parse(cachedKakao);
-    renderKakaoProfileBanner(u);
-    if (u.accessToken && window.Kakao?.isInitialized()) Kakao.Auth.setAccessToken(u.accessToken);
+  renderTripsScreen(memberships || []);
+  showScreen('screenTrips');
+}
+
+function renderTripsScreen(memberships) {
+  const list = document.getElementById('tripsList');
+  if (!memberships.length) {
+    list.innerHTML = `<div class="trips-empty"><span>✈️</span><p>아직 여행이 없어요<br>새 여행을 만들어보세요!</p></div>`;
+    return;
   }
 
-  bindEvents();
+  list.innerHTML = memberships.map(m => {
+    const g = m.trip_groups;
+    if (!g) return '';
+    const destEmoji = Object.entries(EMOJIS_BY_DEST).find(([k]) => g.dest?.includes(k))?.[1] || '🗺️';
+    const dateStr = g.start_date
+      ? `${g.start_date.slice(5).replace('-','/')}${g.end_date ? ' ~ ' + g.end_date.slice(5).replace('-','/') : ''}`
+      : '날짜 미설정';
+    return `
+      <div class="trip-card" onclick="enterTrip('${g.id}','${m.id}')">
+        <div class="trip-card-emoji">${destEmoji}</div>
+        <div class="trip-card-info">
+          <div class="trip-card-name">${escapeHtml(g.name)}</div>
+          <div class="trip-card-meta">${g.dest ? escapeHtml(g.dest) + ' · ' : ''}${dateStr}</div>
+        </div>
+        <div class="trip-card-arrow">›</div>
+      </div>`;
+  }).join('');
+}
 
-  const groupId = localStorage.getItem(TM_GROUP_KEY);
-  if (groupId) {
-    showToast('데이터 불러오는 중...', '');
-    const ok = await loadGroupData(groupId);
-    if (ok) {
-      subscribeRealtime(groupId);
-    }
-  }
-
+async function enterTrip(groupId, memberId) {
+  localStorage.setItem(TM_GROUP_KEY, groupId);
+  localStorage.setItem(TM_MEMBER_KEY, memberId);
+  showToast('불러오는 중...', '');
+  const ok = await loadGroupData(groupId);
+  if (!ok) { showToast('불러오기 실패', 'error'); return; }
+  subscribeRealtime(groupId);
   renderGroupTab();
   renderSchedule();
   renderExpenses();
   renderRestaurants();
+  showScreen('app');
+}
+
+// ══════════════════════════════════════════════════════
+//  앱 초기화
+// ══════════════════════════════════════════════════════
+async function init() {
+  if (window.Kakao && !Kakao.isInitialized()) Kakao.init(KAKAO_APP_KEY);
+
+  await handleKakaoCallback();
+
+  const kakaoUser = JSON.parse(localStorage.getItem(TM_KAKAO_KEY) || 'null');
+  if (!kakaoUser) {
+    showScreen('screenLogin');
+    return;
+  }
+
+  if (kakaoUser.accessToken && window.Kakao?.isInitialized()) {
+    Kakao.Auth.setAccessToken(kakaoUser.accessToken);
+  }
+
+  bindEvents();
+  await loadMyTrips();
 }
 
 document.addEventListener('DOMContentLoaded', init);

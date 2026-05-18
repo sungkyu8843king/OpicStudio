@@ -53,6 +53,137 @@ a { text-decoration: none; color: inherit; }
 img { max-width: 100%; display: block; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 
+/* ─── 로그인 화면 ────────────────────────────────────── */
+.screen-login {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #fff8f5 0%, #fff 60%, #f0f5ff 100%);
+  padding: 40px 24px;
+  gap: 48px;
+}
+.login-brand { text-align: center; }
+.login-plane {
+  font-size: 64px;
+  margin-bottom: 16px;
+  animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.login-title { font-size: 36px; font-weight: 800; color: #FF6B35; letter-spacing: -1px; }
+.login-sub { font-size: 16px; color: var(--text-3); margin-top: 8px; }
+.login-body { width: 100%; max-width: 320px; }
+.btn-kakao-login {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #FEE500;
+  color: #3C1E1E;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 16px 24px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(254,229,0,.4);
+  transition: transform .1s, box-shadow .1s;
+}
+.btn-kakao-login:active { transform: scale(0.97); box-shadow: none; }
+
+/* ─── 내 여행 목록 화면 ──────────────────────────────── */
+.screen-trips {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.trips-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+.trips-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.trips-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+}
+.trips-avatar-text {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.trips-username { font-size: 15px; font-weight: 600; }
+.trips-logout-btn {
+  font-size: 13px;
+  color: var(--text-3);
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+.trips-content {
+  flex: 1;
+  padding: 20px 16px;
+  overflow-y: auto;
+}
+.trips-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+.trips-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.trips-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-3);
+}
+.trips-empty span { font-size: 40px; display: block; margin-bottom: 12px; }
+.trips-empty p { font-size: 15px; line-height: 1.6; }
+.trip-card {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform .1s, box-shadow .1s;
+  border: 1.5px solid transparent;
+}
+.trip-card:active { transform: scale(0.98); box-shadow: none; }
+.trip-card-emoji { font-size: 28px; flex-shrink: 0; }
+.trip-card-info { flex: 1; min-width: 0; }
+.trip-card-name { font-size: 16px; font-weight: 700; color: var(--text); }
+.trip-card-meta { font-size: 13px; color: var(--text-3); margin-top: 3px; }
+.trip-card-arrow { font-size: 22px; color: var(--text-3); flex-shrink: 0; }
+.trips-cta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.trips-cta-row .btn { width: 100%; padding: 14px; font-size: 15px; }
+
 /* ─── App Shell ──────────────────────────────────────── */
 #app {
   display: flex;
@@ -81,6 +212,7 @@ img { max-width: 100%; display: block; }
 .app-bar-left { display: flex; align-items: center; gap: 8px; }
 .app-logo { font-size: 22px; line-height: 1; }
 .app-title { font-size: 18px; font-weight: 700; color: var(--text); }
+#backToTripsBtn { font-size: 20px; color: var(--primary); padding: 4px 6px; }
 .app-bar-right { display: flex; gap: 4px; }
 
 /* ─── Main Content ───────────────────────────────────── */

@@ -10,12 +10,43 @@
 </head>
 <body>
 
-<div id="app">
+<!-- ── 로그인 화면 ───────────────────────────────── -->
+<div id="screenLogin" class="screen-login">
+  <div class="login-brand">
+    <div class="login-plane">✈️</div>
+    <h1 class="login-title">TripMate</h1>
+    <p class="login-sub">함께 떠나는 여행 플래너</p>
+  </div>
+  <div class="login-body">
+    <button class="btn-kakao-login" id="loginKakaoBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#3C1E1E"><path d="M12 3C6.477 3 2 6.477 2 12c0 3.86 2.18 7.21 5.39 8.94L6 21l3.27-.87C10.3 20.37 11.13 20.5 12 20.5c5.523 0 10-3.477 10-7.5S17.523 3 12 3z"/></svg>
+      카카오로 시작하기
+    </button>
+  </div>
+</div>
+
+<!-- ── 내 여행 목록 화면 ─────────────────────────── -->
+<div id="screenTrips" class="screen-trips hidden">
+  <div class="trips-header">
+    <div id="tripsProfile" class="trips-user-info"></div>
+    <button class="trips-logout-btn" id="tripsLogoutBtn">로그아웃</button>
+  </div>
+  <div class="trips-content">
+    <h2 class="trips-section-title">내 여행</h2>
+    <div id="tripsList" class="trips-list"></div>
+    <div class="trips-cta-row">
+      <button class="btn btn-primary" id="tripsCreateBtn">✈️ 새 여행 만들기</button>
+      <button class="btn btn-outline" id="tripsJoinBtn">🔗 코드로 참여하기</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
 
   <!-- ── App Bar ─────────────────────────────────── -->
   <header class="app-bar">
     <div class="app-bar-left">
-      <span class="app-logo">✈️</span>
+      <button class="icon-btn" id="backToTripsBtn" title="내 여행 목록">←</button>
       <span class="app-title" id="appBarTitle">트립메이트</span>
     </div>
     <div class="app-bar-right">
@@ -30,20 +61,8 @@
     <!-- TAB: 그룹 -->
     <section class="tab-pane active" id="tab-group">
 
-      <!-- 그룹 없음 -->
-      <div class="empty-hero" id="noGroupState">
-        <div class="empty-plane">✈️</div>
-        <h2>함께 여행을 시작하세요</h2>
-        <p>카카오 계정으로 로그인 후 그룹을 만들거나 참여하세요</p>
-        <div id="kakaoProfileBanner" class="kakao-profile-banner hidden"></div>
-        <div class="empty-actions">
-          <button class="btn btn-primary btn-lg" id="createGroupBtn">+ 그룹 만들기</button>
-          <button class="btn btn-outline btn-lg" id="joinGroupBtn">초대 코드 참여</button>
-        </div>
-      </div>
-
       <!-- 그룹 있음 -->
-      <div class="group-content hidden" id="groupState">
+      <div class="group-content" id="groupState">
 
         <div class="card group-hero-card">
           <div class="group-emoji-wrap" id="groupEmojiWrap">🏝️</div>
