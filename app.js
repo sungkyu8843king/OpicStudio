@@ -446,7 +446,8 @@ function kakaoCategToType(cat) {
   if (cat.includes('음식점') || cat.includes('식당') || cat.includes('맛집') || cat.includes('레스토랑')) return 'restaurant';
   if (cat.includes('교통') || cat.includes('지하철') || cat.includes('버스') || cat.includes('공항') || cat.includes('기차') || cat.includes('항구') || cat.includes('터미널')) return 'transport';
   if (cat.includes('쇼핑') || cat.includes('마트') || cat.includes('백화점') || cat.includes('편의점') || cat.includes('면세')) return 'shopping';
-  if (cat.includes('관광') || cat.includes('명소') || cat.includes('문화') || cat.includes('역사') || cat.includes('공원') || cat.includes('테마파크') || cat.includes('놀이')) return 'attraction';
+  if (cat.includes('테마파크') || cat.includes('놀이') || cat.includes('액티비티') || cat.includes('스포츠') || cat.includes('레저') || cat.includes('오락') || cat.includes('볼링') || cat.includes('노래') || cat.includes('게임')) return 'activity';
+  if (cat.includes('관광') || cat.includes('명소') || cat.includes('문화') || cat.includes('역사') || cat.includes('공원') || cat.includes('수목원') || cat.includes('박물관') || cat.includes('미술관')) return 'attraction';
   return 'other';
 }
 
@@ -750,6 +751,24 @@ function renderSchedule() {
   timelineWrap.appendChild(timeline);
 }
 
+function suggestNextTime() {
+  const dayIdx = state.currentDay ?? 0;
+  const places = state.schedule[dayIdx]?.places ?? [];
+  const times = places
+    .map(p => p.time)
+    .filter(t => t && /^\d{2}:\d{2}$/.test(t))
+    .map(t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; });
+
+  if (times.length === 0) return '09:00';
+
+  const lastMin = Math.max(...times);
+  // 식당·카페면 1시간, 그 외 2시간 여유
+  const nextMin = lastMin + 120;
+  const h = Math.floor(nextMin / 60) % 24;
+  const m = nextMin % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
 function openAddPlaceModal() {
   if (!state.group) { showToast('먼저 그룹을 만드세요', 'error'); return; }
 
@@ -768,7 +787,7 @@ function openAddPlaceModal() {
   document.getElementById('apNote').value = '';
   document.getElementById('apCoords').classList.add('hidden');
   document.getElementById('placeSearchResults').classList.add('hidden');
-  document.getElementById('apTime').value = '09:00';
+  document.getElementById('apTime').value = suggestNextTime();
   state.pendingPlace = null;
 
   openModal('add-place');
@@ -1307,6 +1326,10 @@ function bindEvents() {
   document.getElementById('addMemberBtn').addEventListener('click', () => openModal('join-group'));
 
   // 일정 탭
+  document.getElementById('apDay').addEventListener('change', e => {
+    state.currentDay = parseInt(e.target.value);
+    document.getElementById('apTime').value = suggestNextTime();
+  });
   document.getElementById('addPlaceBtn').addEventListener('click', openAddPlaceModal);
   document.getElementById('searchPlaceBtn').addEventListener('click', searchPlace);
   document.getElementById('apAddress').addEventListener('keydown', e => { if (e.key === 'Enter') searchPlace(); });
