@@ -963,6 +963,9 @@ img { max-width: 100%; display: block; }
   height: 48px;
   max-width: 200px;
 }
+/* translateX(-50%)를 유지한 채 scale 적용 */
+.expense-fab:hover  { transform: translateX(-50%) scale(1.05); }
+.expense-fab:active { transform: translateX(-50%) scale(0.97); }
 
 .receipt-area { display: flex; align-items: center; gap: 10px; }
 .file-label { font-size: 13px; color: var(--text-3); }
