@@ -122,47 +122,45 @@ async function refreshMapMarkers() {
 
   // 멤버 레이어: 실시간 위치 공유 기능 준비 중 (현재 미표시)
 
-  // 작업 4: Day별 다색 경로 표시
+  // 세그먼트별 다색 경로 + 거리/시간 표시
   if (activeLayer === 'all' || activeLayer === 'route') {
     const daysWithRoute = [];
     state.schedule.forEach((day, di) => {
-      const sortedPlaces = [...day.places]
+      const sorted = [...day.places]
         .filter(p => p.lat && p.lng)
         .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
-      if (sortedPlaces.length > 1) {
-        daysWithRoute.push({ places: sortedPlaces, di });
-      }
+      if (sorted.length > 1) daysWithRoute.push({ places: sorted, di });
     });
 
     if (daysWithRoute.length > 0) {
-      // 경로 그리기 (Day별 색상)
-      for (const { places, di } of daysWithRoute) {
-        const color = ROUTE_COLORS[di % ROUTE_COLORS.length];
-        await drawRoadRoute(places, color);
-      }
+      // 모든 세그먼트(인접 장소 쌍) 수집
+      const segments = [];
+      daysWithRoute.forEach(({ places, di }) => {
+        for (let i = 0; i < places.length - 1; i++) {
+          segments.push({
+            from: places[i], to: places[i + 1],
+            fromSeq: i + 1, toSeq: i + 2, di,
+            color: SEG_COLORS[segments.length % SEG_COLORS.length],
+          });
+        }
+      });
 
-      // 범례 표시
-      if (daysWithRoute.length > 1) {
-        const legendNode = document.createElement('div');
-        legendNode.style.cssText = `background:rgba(255,255,255,.92);border-radius:8px;padding:8px 10px;box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:12px;`;
-        legendNode.innerHTML = daysWithRoute.map(({ di }) => {
-          const color = ROUTE_COLORS[di % ROUTE_COLORS.length];
-          return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="width:20px;height:4px;background:${color};border-radius:2px;display:inline-block"></span><span>Day ${di+1}</span></div>`;
-        }).join('');
+      // 병렬로 모든 세그먼트 경로 요청
+      const results = await Promise.all(
+        segments.map(s => drawSegmentRoute(s.from, s.to, s.color, s.fromSeq, s.toSeq))
+      );
+      segments.forEach((s, i) => {
+        s.distance = results[i].distance;
+        s.duration = results[i].duration;
+      });
 
-        // 지도 우상단에 범례 표시
-        const firstPlace = daysWithRoute[0].places[0];
-        _mapLegendOverlay = new kakao.maps.CustomOverlay({
-          position: new kakao.maps.LatLng(firstPlace.lat, firstPlace.lng),
-          content: legendNode,
-          yAnchor: 0,
-          xAnchor: -0.05,
-          zIndex: 5,
-        });
-        _mapLegendOverlay.setMap(mapInstance);
-        _mapOverlays.push(_mapLegendOverlay);
-      }
+      // 하단 정보 바 업데이트
+      buildRouteInfoBar(segments, daysWithRoute.length > 1);
+    } else {
+      buildRouteInfoBar([], false);
     }
+  } else {
+    buildRouteInfoBar([], false);
   }
 
   if (allPlaces.length > 0) {
@@ -172,42 +170,133 @@ async function refreshMapMarkers() {
   }
 }
 
-// 작업 4: drawRoadRoute 시그니처 변경 → color 파라미터 추가
-async function drawRoadRoute(places, color) {
-  const routeColor = color || '#FF6B35';
-  // OSRM 무료 도로 라우팅
-  const coords = places.map(p => `${p.lng},${p.lat}`).join(';');
+// ── 거리 포맷 ─────────────────────────────────────────
+function formatDist(m) {
+  if (m == null) return '?';
+  return m < 1000 ? Math.round(m) + 'm' : (m / 1000).toFixed(1) + 'km';
+}
+
+// ── 시간 포맷 ─────────────────────────────────────────
+function formatDur(s) {
+  if (s == null) return '?';
+  const min = Math.round(s / 60);
+  if (min < 1) return '1분 미만';
+  if (min < 60) return min + '분';
+  const h = Math.floor(min / 60), r = min % 60;
+  return r ? `${h}시간 ${r}분` : `${h}시간`;
+}
+
+// ── 세그먼트 경로 그리기 (두 장소 사이) ───────────────
+async function drawSegmentRoute(from, to, color, fromSeq, toSeq) {
   try {
     const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`
+      `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`
     );
     const data = await res.json();
-    const geojson = data.routes?.[0]?.geometry;
-    if (!geojson) throw new Error('no route');
+    const route = data.routes?.[0];
+    if (!route) throw new Error('no route');
 
-    const path = geojson.coordinates.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng));
+    const path = route.geometry.coordinates.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng));
     const poly = new kakao.maps.Polyline({
       path,
-      strokeWeight: 5,
-      strokeColor: routeColor,
-      strokeOpacity: 0.85,
+      strokeWeight: 6,
+      strokeColor: color,
+      strokeOpacity: 0.9,
       strokeStyle: 'solid',
     });
     poly.setMap(mapInstance);
     _routePolylines.push(poly);
+
+    // 경로 중간 지점에 거리/시간 배지
+    if (path.length > 0) {
+      const mid = path[Math.floor(path.length / 2)];
+      const badge = document.createElement('div');
+      badge.style.cssText = [
+        'background:#fff',
+        `border:2.5px solid ${color}`,
+        'border-radius:14px',
+        'padding:3px 9px',
+        'font-size:11px',
+        'font-weight:700',
+        'white-space:nowrap',
+        'box-shadow:0 2px 8px rgba(0,0,0,.18)',
+        'color:#1a1a1a',
+        'pointer-events:none',
+        'line-height:1.5',
+      ].join(';');
+      badge.innerHTML = `<span style="color:${color}">⑤</span> ${formatDist(route.distance)} · ${formatDur(route.duration)}`
+        .replace('⑤', `<span style="font-size:10px;color:${color};font-weight:800">${fromSeq}→${toSeq}</span>`);
+      const ov = new kakao.maps.CustomOverlay({ position: mid, content: badge, yAnchor: 0.5, zIndex: 3 });
+      ov.setMap(mapInstance);
+      _mapOverlays.push(ov);
+    }
+
+    return { distance: route.distance, duration: route.duration };
   } catch {
-    // fallback: 직선
-    const path = places.map(p => new kakao.maps.LatLng(p.lat, p.lng));
+    // fallback: 점선 직선
+    const path = [new kakao.maps.LatLng(from.lat, from.lng), new kakao.maps.LatLng(to.lat, to.lng)];
     const poly = new kakao.maps.Polyline({
-      path,
-      strokeWeight: 4,
-      strokeColor: routeColor,
-      strokeOpacity: 0.6,
-      strokeStyle: 'shortdot',
+      path, strokeWeight: 4, strokeColor: color, strokeOpacity: 0.6, strokeStyle: 'shortdot',
     });
     poly.setMap(mapInstance);
     _routePolylines.push(poly);
+    return { distance: null, duration: null };
   }
+}
+
+// ── 하단 경로 정보 바 ──────────────────────────────────
+function buildRouteInfoBar(segments, multiDay) {
+  const bar = document.getElementById('routeInfoBar');
+  if (!bar) return;
+  // 지도 top 조정 (정보바 높이만큼)
+  const adjustMapTop = () => {
+    const mapEl = document.getElementById('kakaoMap');
+    if (!mapEl) return;
+    const barH = bar.offsetHeight || 0;
+    mapEl.style.top = (48 + barH) + 'px';
+    if (mapInstance) kakao.maps.event.trigger(mapInstance, 'resize');
+  };
+
+  if (!segments.length) {
+    bar.innerHTML = '';
+    adjustMapTop();
+    return;
+  }
+
+  // Day별 그룹핑
+  const byDay = {};
+  segments.forEach(s => { (byDay[s.di] = byDay[s.di] || []).push(s); });
+
+  let html = '';
+  Object.entries(byDay).forEach(([di, segs]) => {
+    if (multiDay) {
+      html += `<span class="rinfo-day">Day ${Number(di) + 1}</span>`;
+    }
+    segs.forEach(s => {
+      const from6 = s.from.name.length > 5 ? s.from.name.slice(0, 5) + '…' : s.from.name;
+      const to6   = s.to.name.length > 5   ? s.to.name.slice(0, 5)   + '…' : s.to.name;
+      html += `
+        <div class="rinfo-chip">
+          <span class="rinfo-dot" style="background:${s.color}"></span>
+          <span class="rinfo-label">${escapeHtml(from6)}→${escapeHtml(to6)}</span>
+          <span class="rinfo-val">${formatDist(s.distance)}</span>
+          <span class="rinfo-sep">·</span>
+          <span class="rinfo-val">${formatDur(s.duration)}</span>
+        </div>`;
+    });
+
+    // 일별 합계 (세그먼트 2개 이상)
+    if (segs.length > 1) {
+      const td = segs.reduce((a, s) => a + (s.distance || 0), 0);
+      const tt = segs.reduce((a, s) => a + (s.duration  || 0), 0);
+      html += `<div class="rinfo-total">합계 ${formatDist(td)} · ${formatDur(tt)}</div>`;
+    }
+    if (multiDay) html += `<span class="rinfo-divider"></span>`;
+  });
+
+  bar.innerHTML = html;
+  // 렌더 후 높이 확정되면 지도 top 재조정
+  requestAnimationFrame(adjustMapTop);
 }
 
 function requestLocation() {

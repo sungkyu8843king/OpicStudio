@@ -772,12 +772,61 @@ img { max-width: 100%; display: block; }
 }
 .map-layer-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
+/* ── 경로 정보 바 ── */
+.route-info-bar {
+  position: absolute;
+  top: 48px; left: 0; right: 0;
+  z-index: 15;
+  display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding: 6px 10px;
+  background: rgba(255,255,255,.97);
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+  flex-wrap: nowrap;
+  min-height: 0;
+  transition: min-height .2s;
+}
+.route-info-bar:empty { padding: 0; border: none; }
+.route-info-bar::-webkit-scrollbar { display: none; }
+.rinfo-day {
+  font-size: 10px; font-weight: 800; color: var(--primary);
+  background: #fff4ef; border: 1px solid #ffddd0;
+  border-radius: 10px; padding: 2px 7px;
+  flex-shrink: 0; white-space: nowrap;
+}
+.rinfo-chip {
+  display: flex; align-items: center; gap: 4px;
+  flex-shrink: 0; white-space: nowrap;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 9px;
+}
+.rinfo-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.rinfo-label { font-size: 11px; color: var(--text-3); }
+.rinfo-val { font-size: 11px; font-weight: 700; color: var(--text-1); }
+.rinfo-sep { font-size: 10px; color: var(--text-3); }
+.rinfo-total {
+  flex-shrink: 0; white-space: nowrap;
+  font-size: 11px; font-weight: 700; color: var(--primary);
+  padding: 3px 9px;
+  background: #fff4ef;
+  border: 1px solid #ffddd0;
+  border-radius: 20px;
+}
+.rinfo-divider {
+  width: 1px; height: 20px; background: var(--border);
+  flex-shrink: 0;
+}
+
 .leaflet-map {
   position: absolute;
   inset: 0;
   top: 48px;
   z-index: 10;
 }
+/* routeInfoBar가 있을 때 지도 top 조정은 JS에서 동적으로 처리 */
 
 .map-fabs {
   position: absolute;

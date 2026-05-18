@@ -40,8 +40,11 @@ const CAT_LABEL = {
   activity: '액티비티', shopping: '쇼핑', other: '기타',
 };
 
-// Day별 경로 색상 팔레트
+// Day별 경로 색상 팔레트 (범례용)
 const ROUTE_COLORS = ['#FF6B35','#3A86FF','#27AE60','#9B59B6','#E74C3C','#F39C12','#1ABC9C','#E91E63'];
+
+// 세그먼트별 구간 색상 (①→②, ②→③ 각각 다른 색)
+const SEG_COLORS = ['#FF6B35','#3A86FF','#22C55E','#F59E0B','#A855F7','#EC4899','#14B8A6','#EF4444','#6366F1','#84CC16'];
 
 // ── 한국 주요 장소 검색 DB ─────────────────────────────
 const PLACE_DB = [
