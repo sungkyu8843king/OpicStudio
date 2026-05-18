@@ -1123,30 +1123,149 @@ img { max-width: 100%; display: block; }
 
 /* ─── 추천 탭 ─────────────────────────────────────────── */
 .recommend-wrap { padding: 16px; }
-.rec-section { background: #fff; border-radius: var(--radius); padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+.rec-section {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+}
 .rec-section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
-.packing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.packing-item { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
-.packing-check { width: 16px; height: 16px; accent-color: var(--primary); }
-.packing-item:has(.packing-check:checked) span { text-decoration: line-through; color: var(--text-3); }
-.rec-place-list { display: flex; flex-direction: column; gap: 8px; }
-.rec-place-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; transition: background .15s; }
-.rec-place-item:hover { background: var(--bg); }
-.rec-place-name { font-size: 14px; font-weight: 600; }
-.rec-place-addr { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-.rec-place-phone { font-size: 12px; color: var(--accent); margin-top: 2px; }
+
+/* ── 헤더 히어로 ── */
+.rec-hero {
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+  color: #fff;
+}
+.rec-hero-dest { font-size: 18px; font-weight: 700; }
+.rec-hero-info { font-size: 13px; opacity: .85; margin-top: 2px; }
+.rec-refresh-main {
+  background: rgba(255,255,255,.2);
+  border: 1px solid rgba(255,255,255,.4);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px; padding: 7px 13px;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background .15s;
+}
+.rec-refresh-main:hover { background: rgba(255,255,255,.32); }
+
+/* ── AI 로딩 / 에러 ── */
+.rec-ai-loading {
+  text-align: center; padding: 60px 20px;
+  color: var(--text-3);
+}
+.rec-ai-loading p { font-size: 15px; font-weight: 600; color: var(--text-1); margin: 12px 0 4px; }
+.rec-ai-loading span { font-size: 13px; }
+.rec-ai-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  margin: 0 auto;
+}
+.rec-error {
+  text-align: center; padding: 60px 20px;
+  color: var(--text-3); display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.rec-error span { font-size: 36px; }
+.rec-error p { font-size: 14px; margin: 0; }
 .empty-rec { text-align: center; padding: 60px 20px; color: var(--text-3); }
 .empty-rec span { font-size: 40px; display: block; margin-bottom: 12px; }
-.rec-loading-inline { text-align: center; padding: 20px; color: var(--text-3); font-size: 14px; }
-.spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 8px; }
 
-/* ─── 추천 섹션 헤더 (↻ 새로고침 버튼) ─── */
+/* ── 준비물 체크리스트 ── */
+.packing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.packing-item {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; cursor: pointer;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  transition: background .15s;
+  user-select: none;
+}
+.packing-item:hover { background: var(--border); }
+.packing-check { width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
+.packing-emoji { font-size: 16px; flex-shrink: 0; }
+.packing-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.packing-done .packing-text { text-decoration: line-through; color: var(--text-3); }
+.packing-done { opacity: .6; }
+
+/* ── 추천 장소 그리드 ── */
+.rec-place-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.rec-place-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  cursor: default;
+}
+.rec-place-card-top {
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.rec-place-card-emoji { font-size: 22px; flex-shrink: 0; line-height: 1; }
+.rec-place-card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rec-place-card-name { font-size: 14px; font-weight: 700; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-place-card-badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 600;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 20px;
+  width: fit-content;
+}
+.rec-place-card-desc { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+.rec-place-card-tip { font-size: 11px; color: var(--text-3); background: var(--bg); border-radius: 4px; padding: 4px 6px; }
+.rec-place-map-btn {
+  margin-top: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px; padding: 4px 0;
+  color: var(--text-2);
+  cursor: pointer; width: 100%;
+  transition: background .15s;
+}
+.rec-place-map-btn:hover { background: var(--bg); }
+
+/* ── 여행 꿀팁 ── */
+.rec-tips-list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.rec-tip-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; color: var(--text-1); line-height: 1.5;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--primary);
+}
+.rec-tip-emoji { font-size: 18px; flex-shrink: 0; line-height: 1.3; }
+
+/* ── 섹션 헤더 (↻ 버튼 포함) ── */
 .rec-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .rec-section-header .rec-section-title { margin-bottom: 0; }
-.rec-refresh-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 15px; color: var(--text-2); cursor: pointer; transition: background .15s; line-height: 1; }
+.rec-refresh-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 8px;
+  font-size: 15px; color: var(--text-2);
+  cursor: pointer; transition: background .15s; line-height: 1;
+}
 .rec-refresh-btn:hover { background: var(--bg); }
 
-/* ─── AI 제안 리스트 ─── */
+/* ── AI 제안 리스트 (혹시 이것도) ── */
 .ai-suggest-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .ai-suggest-item { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; transition: background .15s, opacity .2s; }
 .ai-suggest-item:hover { background: var(--bg); }
@@ -1159,4 +1278,6 @@ img { max-width: 100%; display: block; }
 .ai-suggest-done { opacity: .45; }
 .ai-suggest-done .ai-suggest-name { text-decoration: line-through; }
 .ai-suggest-empty { font-size: 13px; color: var(--text-3); padding: 8px 0; margin: 0; }
+.rec-loading-inline { text-align: center; padding: 20px; color: var(--text-3); font-size: 14px; }
+.spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 8px; }
 @keyframes spin { to { transform: rotate(360deg); } }

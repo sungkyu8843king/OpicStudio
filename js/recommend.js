@@ -1,119 +1,213 @@
 /* ─── js/recommend.js ──────────────────────────────────
-   renderRecommendations, buildPackingList,
-   loadKakaoRecommendations, loadAISuggestions
+   renderRecommendations, loadFullAIRecommendations,
+   renderRecSections, toggleAISuggest, togglePackingItem
    ──────────────────────────────────────────────────── */
+
+let _recCache = null;  // { key, data }
 
 async function renderRecommendations() {
   const wrap = document.getElementById('recContent');
   if (!state.group) {
-    wrap.innerHTML = '<div class="empty-rec"><span>✨</span><p>여행 그룹을 만들면<br>맞춤 추천을 드려요</p></div>';
+    wrap.innerHTML = `
+      <div class="empty-rec">
+        <span>✨</span>
+        <p>여행 그룹을 만들면<br>AI 맞춤 추천을 드려요</p>
+      </div>`;
+    return;
+  }
+  if (!state.group.dest) {
+    wrap.innerHTML = `
+      <div class="empty-rec">
+        <span>📍</span>
+        <p>그룹 설정에서 여행지를 입력하면<br>AI 맞춤 추천을 드려요</p>
+      </div>`;
+    return;
+  }
+  await loadFullAIRecommendations();
+}
+
+// ── AI 전체 추천 로드 ──────────────────────────────────
+async function loadFullAIRecommendations(forceRefresh) {
+  const wrap = document.getElementById('recContent');
+  const g    = state.group;
+  const nights = g.startDate && g.endDate
+    ? Math.max(0, daysBetween(g.startDate, g.endDate) - 1) : 0;
+
+  // 캐시 키: 여행지 + 기간 + 인원 + 일정 + 경비
+  const scheduleKey = state.schedule.flatMap(d => (d.places || []).map(p => p.name)).join('|');
+  const expenseKey  = state.expenses.map(e => e.name).sort().join('|');
+  const cacheKey    = [g.dest, nights, g.adults || 0, g.infants || 0, scheduleKey, expenseKey].join('__');
+
+  if (!forceRefresh && _recCache?.key === cacheKey) {
+    renderRecSections(_recCache.data);
     return;
   }
 
-  const g = state.group;
-  const dest = g.dest || '';
-
-  // 1. 기본 준비물 체크리스트
-  let html = buildPackingList(g, state.schedule.flatMap(d => d.places));
-
-  // 2. AI 빠진 물건 체크 섹션 (경비 기반)
-  html += buildAISuggestSection();
-
-  // 3. Kakao 추천 장소 (비동기)
-  wrap.innerHTML = html + `<div id="kakaoRecPlaces"><div class="rec-loading-inline">📍 주변 장소 검색 중...</div></div>`;
-
-  // AI 제안 로드 (경비가 있을 때만)
-  if (state.expenses.length > 0) {
-    loadAISuggestions();
-  } else {
-    document.getElementById('aiSuggestBody')?.closest('.rec-section')
-      && (document.getElementById('aiSuggestBody').innerHTML =
-        '<p class="ai-suggest-empty">경비를 추가하면 AI가 빠진 물건을 찾아드려요 💡</p>');
-  }
-
-  // Kakao 추천 장소
-  if (dest) loadKakaoRecommendations(dest);
-  else document.getElementById('kakaoRecPlaces').innerHTML = '';
-}
-
-// ── AI 제안 섹션 골격 ──────────────────────────────────
-function buildAISuggestSection() {
-  return `
-    <div class="rec-section" id="aiSuggestSection">
-      <div class="rec-section-header">
-        <div class="rec-section-title">🤖 혹시 이것도 챙기셨나요?</div>
-        <button class="rec-refresh-btn" onclick="loadAISuggestions(true)" title="다시 분석">↻</button>
-      </div>
-      <div id="aiSuggestBody">
-        <div class="rec-loading-inline">AI 분석 중...</div>
-      </div>
+  // 로딩 UI
+  wrap.innerHTML = `
+    <div class="rec-ai-loading">
+      <div class="rec-ai-spinner"></div>
+      <p>AI가 <strong>${escapeHtml(g.dest)}</strong> 여행을 분석 중...</p>
+      <span>준비물 · 추천 장소 · 여행 꿀팁을 생성하고 있어요</span>
     </div>`;
-}
-
-// ── Claude AI 제안 로드 ────────────────────────────────
-async function loadAISuggestions(forceRefresh) {
-  const body = document.getElementById('aiSuggestBody');
-  if (!body) return;
-
-  // 캐시: 같은 경비 목록이면 재호출 안 함
-  const cacheKey = state.expenses.map(e => e.name).sort().join('|');
-  if (!forceRefresh && window._aiSuggestCache?.key === cacheKey) {
-    body.innerHTML = window._aiSuggestCache.html;
-    return;
-  }
-
-  body.innerHTML = '<div class="rec-loading-inline">🤖 경비 목록 분석 중...</div>';
 
   try {
-    const g = state.group;
-    const nights = g.startDate && g.endDate ? Math.max(0, daysBetween(g.startDate, g.endDate) - 1) : 0;
-
-    const res = await fetch('/api/recommend', {
+    const res = await fetch('/api/recommend-full', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        expenses: state.expenses.map(e => ({
-          name: e.name,
-          amount: e.amount,
-          category: e.category,
-        })),
         trip: {
-          dest:    g.dest,
+          dest:      g.dest,
           nights,
-          adults:  g.adults,
-          infants: g.infants,
+          startDate: g.startDate || null,
+          adults:    g.adults    || 0,
+          infants:   g.infants   || 0,
         },
+        schedule: state.schedule.map(d => ({
+          label:  d.label,
+          places: (d.places || []).map(p => ({ name: p.name })),
+        })),
+        expenses: state.expenses.map(e => ({
+          name: e.name, amount: e.amount, category: e.category,
+        })),
       }),
     });
 
     const data = await res.json();
-    if (!data.ok || !data.suggestions?.length) {
-      body.innerHTML = '<p class="ai-suggest-empty">현재 경비 목록 기준으로 특별히 빠진 항목이 없어 보여요 👍</p>';
-      return;
-    }
+    if (!data.ok) throw new Error(data.error || 'AI 응답 오류');
 
-    const html = `
-      <ul class="ai-suggest-list">
-        ${data.suggestions.map((s, i) => `
-          <li class="ai-suggest-item" id="ais-${i}">
-            <label class="ai-suggest-label">
-              <input type="checkbox" class="ai-suggest-check" onchange="toggleAISuggest(${i})">
-              <span class="ai-suggest-emoji">${s.emoji || '✅'}</span>
-              <div class="ai-suggest-text">
-                <span class="ai-suggest-name">${escapeHtml(s.item)}</span>
-                <span class="ai-suggest-reason">${escapeHtml(s.reason)}</span>
-              </div>
-            </label>
-          </li>`).join('')}
-      </ul>`;
-
-    body.innerHTML = html;
-    window._aiSuggestCache = { key: cacheKey, html };
+    _recCache = { key: cacheKey, data };
+    renderRecSections(data);
 
   } catch (e) {
-    body.innerHTML = '<p class="ai-suggest-empty">AI 분석에 실패했습니다. 잠시 후 다시 시도해보세요.</p>';
-    console.error('[AI suggest]', e);
+    wrap.innerHTML = `
+      <div class="rec-error">
+        <span>😵</span>
+        <p>추천 정보를 불러오지 못했습니다</p>
+        <button class="btn btn-outline sm" onclick="loadFullAIRecommendations(true)">↻ 다시 시도</button>
+      </div>`;
+    console.error('[recommend-full]', e);
   }
+}
+
+// ── AI 추천 결과 렌더링 ────────────────────────────────
+function renderRecSections(data) {
+  const wrap = document.getElementById('recContent');
+  const g    = state.group;
+  const nights = g.startDate && g.endDate
+    ? Math.max(0, daysBetween(g.startDate, g.endDate) - 1) : 0;
+  const total  = (g.adults || 0) + (g.infants || 0);
+
+  let html = '';
+
+  // ── 헤더 ────────────────────────────────────────────
+  html += `
+    <div class="rec-hero">
+      <div class="rec-hero-left">
+        <div class="rec-hero-dest">📍 ${escapeHtml(g.dest)}</div>
+        <div class="rec-hero-info">${nights > 0 ? `${nights}박 ${nights + 1}일` : '당일치기'}${total > 0 ? ` · ${total}명` : ''}</div>
+      </div>
+      <button class="rec-refresh-main" onclick="loadFullAIRecommendations(true)" title="AI 다시 분석">↻ 새로 분석</button>
+    </div>`;
+
+  // ── 1. AI 맞춤 준비물 ──────────────────────────────
+  if (data.packing?.length) {
+    html += `
+      <div class="rec-section">
+        <div class="rec-section-title">🎒 AI 맞춤 준비물</div>
+        <div class="packing-grid">
+          ${data.packing.map((it, i) => `
+            <label class="packing-item" id="pk-${i}" title="${escapeHtml(it.reason || '')}">
+              <input type="checkbox" class="packing-check" onchange="togglePackingItem(${i})">
+              <span class="packing-emoji">${it.emoji || '✅'}</span>
+              <span class="packing-text">${escapeHtml(it.item)}</span>
+            </label>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // ── 2. 추천 장소 ───────────────────────────────────
+  if (data.places?.length) {
+    const catMeta = {
+      restaurant: { label: '맛집',  bg: '#fff7ed', badge: '#f97316' },
+      attraction: { label: '관광지', bg: '#eff6ff', badge: '#3b82f6' },
+      activity:   { label: '체험',  bg: '#f0fdf4', badge: '#22c55e' },
+      cafe:       { label: '카페',  bg: '#fdf4ff', badge: '#a855f7' },
+      shopping:   { label: '쇼핑',  bg: '#fef2f2', badge: '#ef4444' },
+    };
+
+    html += `
+      <div class="rec-section">
+        <div class="rec-section-title">📍 AI 추천 장소</div>
+        <div class="rec-place-grid">
+          ${data.places.map(p => {
+            const cat  = p.category || 'attraction';
+            const meta = catMeta[cat] || catMeta.attraction;
+            const mapUrl = `https://map.kakao.com/?q=${encodeURIComponent(g.dest + ' ' + p.name)}`;
+            return `
+            <div class="rec-place-card" style="--card-bg:${meta.bg}">
+              <div class="rec-place-card-top">
+                <span class="rec-place-card-emoji">${p.emoji || '📍'}</span>
+                <div class="rec-place-card-info">
+                  <span class="rec-place-card-name">${escapeHtml(p.name)}</span>
+                  <span class="rec-place-card-badge" style="background:${meta.badge}">${meta.label}</span>
+                </div>
+              </div>
+              <div class="rec-place-card-desc">${escapeHtml(p.desc || '')}</div>
+              ${p.tip ? `<div class="rec-place-card-tip">💡 ${escapeHtml(p.tip)}</div>` : ''}
+              <button class="rec-place-map-btn" onclick="window.open('${mapUrl}','_blank')">🗺️ 지도 검색</button>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  // ── 3. 여행 꿀팁 ──────────────────────────────────
+  if (data.tips?.length) {
+    html += `
+      <div class="rec-section">
+        <div class="rec-section-title">💡 여행 꿀팁</div>
+        <ul class="rec-tips-list">
+          ${data.tips.map(t => `
+            <li class="rec-tip-item">
+              <span class="rec-tip-emoji">${t.emoji || '💡'}</span>
+              <span>${escapeHtml(t.tip)}</span>
+            </li>`).join('')}
+        </ul>
+      </div>`;
+  }
+
+  // ── 4. 혹시 이것도 챙기셨나요? ───────────────────
+  if (data.missing?.length) {
+    html += `
+      <div class="rec-section">
+        <div class="rec-section-header">
+          <div class="rec-section-title">🤖 혹시 이것도 챙기셨나요?</div>
+          <button class="rec-refresh-btn" onclick="loadFullAIRecommendations(true)" title="다시 분석">↻</button>
+        </div>
+        <ul class="ai-suggest-list">
+          ${data.missing.map((s, i) => `
+            <li class="ai-suggest-item" id="ais-${i}">
+              <label class="ai-suggest-label">
+                <input type="checkbox" class="ai-suggest-check" onchange="toggleAISuggest(${i})">
+                <span class="ai-suggest-emoji">${s.emoji || '✅'}</span>
+                <div class="ai-suggest-text">
+                  <span class="ai-suggest-name">${escapeHtml(s.item)}</span>
+                  <span class="ai-suggest-reason">${escapeHtml(s.reason)}</span>
+                </div>
+              </label>
+            </li>`).join('')}
+        </ul>
+      </div>`;
+  } else if (state.expenses.length === 0) {
+    html += `
+      <div class="rec-section">
+        <div class="rec-section-title">🤖 혹시 이것도 챙기셨나요?</div>
+        <p class="ai-suggest-empty">경비를 추가하면 AI가 빠진 물건을 찾아드려요 💡</p>
+      </div>`;
+  }
+
+  wrap.innerHTML = html;
 }
 
 function toggleAISuggest(idx) {
@@ -121,86 +215,7 @@ function toggleAISuggest(idx) {
   if (item) item.classList.toggle('ai-suggest-done');
 }
 
-// ── 기본 준비물 체크리스트 ─────────────────────────────
-function buildPackingList(group, places) {
-  const dest = group.dest || '';
-  const infants = group.infants || 0;
-  const startDate = group.startDate;
-  const endDate = group.endDate;
-
-  const month = startDate ? new Date(startDate).getMonth() + 1 : new Date().getMonth() + 1;
-  const season = month >= 6 && month <= 8 ? 'summer' : month >= 12 || month <= 2 ? 'winter' : 'other';
-  const isBeach    = /해수욕|해변|바다|섬|제주|여수|부산|속초|강릉/.test(dest);
-  const isMountain = /산|한라|설악|지리|계곡/.test(dest);
-
-  const items = ['여권/신분증', '현금', '충전기', '상비약', '세면도구', '수건'];
-  if (season === 'summer') items.push('선크림', '모자', '선글라스', '여름 옷');
-  if (season === 'winter') items.push('두꺼운 외투', '핫팩', '장갑', '목도리');
-  if (isBeach)    items.push('수영복', '래쉬가드', '물안경', '비치타올');
-  if (isMountain) items.push('등산화', '등산 스틱', '우비', '간식');
-  if (infants > 0) items.push('기저귀', '분유/이유식', '유모차', '아기 옷 여벌');
-
-  const nights = startDate && endDate ? Math.max(0, daysBetween(startDate, endDate) - 1) : 0;
-  if (nights > 0) items.push(`속옷 ${nights+1}벌`, `양말 ${nights+1}켤레`);
-
-  return `
-    <div class="rec-section">
-      <div class="rec-section-title">🎒 준비물 체크리스트</div>
-      <div class="packing-grid">
-        ${items.map(item => `
-          <label class="packing-item">
-            <input type="checkbox" class="packing-check">
-            <span>${item}</span>
-          </label>`).join('')}
-      </div>
-    </div>`;
-}
-
-// ── Kakao 추천 장소/맛집 ───────────────────────────────
-async function loadKakaoRecommendations(dest) {
-  const container = document.getElementById('kakaoRecPlaces');
-  if (!container) return;
-  try {
-    await ensureKakaoMaps();
-    const ps = new kakao.maps.services.Places();
-
-    const [attractions, restaurants] = await Promise.all([
-      new Promise(resolve => {
-        ps.keywordSearch(`${dest} 관광지`, (data, status) =>
-          resolve(status === kakao.maps.services.Status.OK ? data.slice(0, 4) : []), { size: 4 });
-      }),
-      new Promise(resolve => {
-        ps.keywordSearch(`${dest} 맛집`, (data, status) =>
-          resolve(status === kakao.maps.services.Status.OK ? data.slice(0, 4) : []), { size: 4 });
-      }),
-    ]);
-
-    let html = '';
-    if (attractions.length) {
-      html += `<div class="rec-section">
-        <div class="rec-section-title">🏛️ 추천 관광지</div>
-        <div class="rec-place-list">
-          ${attractions.map(p => `
-            <div class="rec-place-item" onclick="window.open('${p.place_url}','_blank')">
-              <div class="rec-place-name">${escapeHtml(p.place_name)}</div>
-              <div class="rec-place-addr">${escapeHtml(p.road_address_name || p.address_name || '')}</div>
-            </div>`).join('')}
-        </div></div>`;
-    }
-    if (restaurants.length) {
-      html += `<div class="rec-section">
-        <div class="rec-section-title">🍽️ 추천 맛집</div>
-        <div class="rec-place-list">
-          ${restaurants.map(p => `
-            <div class="rec-place-item" onclick="window.open('${p.place_url}','_blank')">
-              <div class="rec-place-name">${escapeHtml(p.place_name)}</div>
-              <div class="rec-place-addr">${escapeHtml(p.road_address_name || p.address_name || '')}</div>
-              ${p.phone ? `<div class="rec-place-phone">${p.phone}</div>` : ''}
-            </div>`).join('')}
-        </div></div>`;
-    }
-    container.innerHTML = html || '';
-  } catch(e) {
-    container.innerHTML = '';
-  }
+function togglePackingItem(idx) {
+  const label = document.getElementById(`pk-${idx}`);
+  if (label) label.classList.toggle('packing-done');
 }
