@@ -623,6 +623,16 @@ img { max-width: 100%; display: block; }
   font-weight: 600;
 }
 .member-loc { font-size: 12px; color: var(--text-3); }
+.member-remove-btn {
+  font-size: 12px;
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  margin-left: 6px;
+  transition: color .15s, border-color .15s;
+}
+.member-remove-btn:hover { color: var(--danger); border-color: var(--danger); }
 
 .trip-info-block { display: flex; flex-direction: column; gap: 10px; }
 .info-row { display: flex; align-items: center; gap: 10px; }

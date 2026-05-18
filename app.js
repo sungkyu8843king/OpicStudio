@@ -302,7 +302,12 @@ function renderGroupTab() {
       <span class="member-name">${m.name}</span>
       ${m.isMe ? '<span class="member-me">나</span>' : ''}
       <span class="member-loc">${m.lastSeen || ''}</span>
+      <button class="member-remove-btn" data-id="${m.id}" data-name="${escapeHtml(m.name)}" title="${m.isMe ? '나가기' : '제외'}">${m.isMe ? '나가기' : '제외'}</button>
     `;
+    li.querySelector('.member-remove-btn').addEventListener('click', () => {
+      if (m.isMe) leaveGroup();
+      else removeMember(m.id, m.name);
+    });
     ml.appendChild(li);
   });
 
@@ -410,10 +415,17 @@ async function leaveGroup() {
 
   if (realtimeSub) { realtimeSub.unsubscribe(); realtimeSub = null; }
   clearSession();
-  renderGroupTab();
-  renderSchedule();
-  renderExpenses();
+  loadMyTrips();
   showToast('그룹을 떠났습니다');
+}
+
+async function removeMember(memberId, memberName) {
+  if (!confirm(`${memberName}님을 그룹에서 제외하시겠습니까?`)) return;
+  const { error } = await sb.from('trip_members').delete().eq('id', memberId);
+  if (error) { showToast('제외 실패', 'error'); return; }
+  await loadGroupData(state.group.id);
+  renderGroupTab();
+  showToast(`${memberName}님을 제외했습니다`);
 }
 
 // ══════════════════════════════════════════════════════
