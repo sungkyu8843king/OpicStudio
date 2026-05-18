@@ -1248,8 +1248,10 @@ function bindEvents() {
     });
   });
   document.querySelectorAll('.modal-backdrop').forEach(bd => {
+    let _downOnBd = false;
+    bd.addEventListener('mousedown', e => { _downOnBd = e.target === bd; });
     bd.addEventListener('click', e => {
-      if (e.target === bd) closeModal(bd.id.replace('modal-', ''));
+      if (e.target === bd && _downOnBd) closeModal(bd.id.replace('modal-', ''));
     });
   });
 
