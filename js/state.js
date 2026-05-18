@@ -54,7 +54,7 @@ async function loadGroupData(groupId) {
       id: m.id,
       name: m.name,
       isMe: m.id === myId,
-      lastSeen: m.is_online ? '온라인' : '',
+      lastSeen: '',
     })),
   };
 
