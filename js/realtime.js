@@ -26,5 +26,9 @@ function subscribeRealtime(groupId) {
       renderGroupTab();
       renderSchedule();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_votes', filter: `group_id=eq.${groupId}` }, async () => {
+      await loadVotes();
+      renderVotes();
+    })
     .subscribe();
 }

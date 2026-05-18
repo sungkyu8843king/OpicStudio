@@ -56,6 +56,8 @@ async function loadGroupData(groupId) {
       isMe: m.id === myId,
       lastSeen: '',
     })),
+    myMemberId:   myId || '',
+    myMemberName: (mRes.data || []).find(m => m.id === myId)?.name || '',
   };
 
   // 일정 배열 재구성

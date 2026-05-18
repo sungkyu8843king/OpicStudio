@@ -5,6 +5,80 @@
 
 let _recCache = null;  // { key, data }
 
+// ── 찜하기 ────────────────────────────────────────────
+function _wishKey() {
+  return `tm_wish_${state.group?.id || 'none'}`;
+}
+
+function getWishlist() {
+  try {
+    return JSON.parse(localStorage.getItem(_wishKey()) || '[]');
+  } catch { return []; }
+}
+
+function toggleWishlist(name, emoji, category, desc) {
+  const list = getWishlist();
+  const idx  = list.findIndex(w => w.name === name);
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    showToast('찜 목록에서 제거했습니다');
+  } else {
+    list.push({ name, emoji, category, desc: desc || '' });
+    showToast('찜 목록에 추가했습니다 ❤️', 'success');
+  }
+  localStorage.setItem(_wishKey(), JSON.stringify(list));
+  // 현재 보여지는 하트 버튼 즉시 갱신
+  _refreshWishBtns();
+  renderWishlistSection();
+}
+
+function _refreshWishBtns() {
+  const list = getWishlist();
+  document.querySelectorAll('.rec-wish-btn[data-wish-name]').forEach(btn => {
+    const n = btn.dataset.wishName;
+    const wished = list.some(w => w.name === n);
+    btn.classList.toggle('wished', wished);
+    btn.textContent = wished ? '❤️' : '🤍';
+  });
+}
+
+function renderWishlistSection() {
+  const section = document.getElementById('wishlistSection');
+  if (!section) return;
+  const list = getWishlist();
+  if (!list.length) {
+    section.innerHTML = '';
+    return;
+  }
+  const items = list.map((w, i) => `
+    <div class="wish-item">
+      <span class="wish-emoji">${w.emoji || '📍'}</span>
+      <div class="wish-info">
+        <span class="wish-name">${escapeHtml(w.name)}</span>
+        ${w.desc ? `<span class="wish-desc">${escapeHtml(w.desc)}</span>` : ''}
+      </div>
+      <div class="wish-btns">
+        <button class="btn btn-sm btn-outline" onclick="openAddFromRecModal('${w.name.replace(/'/g,"\\'")}','${w.emoji || '📍'}','${w.category || 'attraction'}')">📅 일정</button>
+        <button class="btn btn-sm btn-outline btn-danger-outline" onclick="_removeWish(${i})">✕</button>
+      </div>
+    </div>`).join('');
+  section.innerHTML = `
+    <div class="card wish-section">
+      <div class="card-header">
+        <h3>❤️ 찜한 장소 <span class="badge-count">${list.length}</span></h3>
+      </div>
+      <div class="wish-list">${items}</div>
+    </div>`;
+}
+
+function _removeWish(idx) {
+  const list = getWishlist();
+  list.splice(idx, 1);
+  localStorage.setItem(_wishKey(), JSON.stringify(list));
+  _refreshWishBtns();
+  renderWishlistSection();
+}
+
 async function renderRecommendations() {
   const wrap = document.getElementById('recContent');
   if (!state.group) {
@@ -158,6 +232,7 @@ function renderRecSections(data) {
               <div class="rec-place-card-btns">
                 <button class="rec-place-map-btn" onclick="window.open('${mapUrl}','_blank')">🗺️ 지도</button>
                 <button class="rec-place-add-btn" onclick="openAddFromRecModal('${p.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${(p.emoji||'📍')}','${p.category||'attraction'}')">📅 일정 추가</button>
+                <button class="rec-wish-btn ${(getWishlist().some(w => w.name === p.name) ? 'wished' : '')}" data-wish-name="${escapeHtml(p.name)}" onclick="toggleWishlist('${p.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${(p.emoji||'📍')}','${p.category||'attraction'}','${(p.desc||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">${getWishlist().some(w => w.name === p.name) ? '❤️' : '🤍'}</button>
               </div>
             </div>`;
           }).join('')}
@@ -211,6 +286,8 @@ function renderRecSections(data) {
   }
 
   wrap.innerHTML = html;
+  // 찜 목록 섹션 갱신
+  renderWishlistSection();
 }
 
 function toggleAISuggest(idx) {

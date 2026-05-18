@@ -81,6 +81,7 @@
               💬 카카오톡 초대
             </button>
             <button class="btn btn-outline sm" id="copyLinkBtn">🔗 링크 복사</button>
+            <button class="btn btn-outline sm" id="reportBtn">📊 리포트</button>
           </div>
         </div>
 
@@ -97,6 +98,18 @@
             <button class="btn btn-sm btn-outline" id="editTripBtn">수정</button>
           </div>
           <div id="tripInfoBlock" class="trip-info-block"></div>
+        </div>
+
+        <!-- 날씨 -->
+        <div id="weatherSection"></div>
+
+        <!-- 투표 -->
+        <div class="card" id="voteCard" style="display:none">
+          <div class="card-header">
+            <h3>투표 <span class="badge-count" id="voteBadge">0</span></h3>
+            <button class="btn btn-sm btn-outline" onclick="openCreateVoteModal()">+ 만들기</button>
+          </div>
+          <div id="voteSection"></div>
         </div>
 
       </div>
@@ -189,6 +202,7 @@
           <div class="spinner"></div><p>추천 정보 불러오는 중...</p>
         </div>
         <div id="recContent"></div>
+        <div id="wishlistSection"></div>
       </div>
     </section>
 
@@ -553,6 +567,43 @@
   </div>
 </div>
 
+<!-- Create Vote Modal -->
+<div class="modal-backdrop hidden" id="modal-create-vote" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>투표 만들기</h3>
+      <button class="modal-close" onclick="closeModal('create-vote')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="cvQuestion">질문 <span class="req">*</span></label>
+        <input id="cvQuestion" type="text" placeholder="예: 어디로 가고 싶으세요?" maxlength="100">
+      </div>
+      <div class="form-group">
+        <label for="cvOptions">선택지 <span class="req">*</span> <small style="color:var(--text-3)">한 줄에 하나씩 입력</small></label>
+        <textarea id="cvOptions" rows="4" placeholder="제주도&#10;부산&#10;강원도"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary full-width" onclick="saveVote()">투표 만들기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Trip Report Modal -->
+<div class="modal-backdrop hidden" id="modal-trip-report" role="dialog" aria-modal="true">
+  <div class="modal modal-report">
+    <div class="modal-header">
+      <h3>📊 여행 리포트</h3>
+      <button class="modal-close" onclick="closeModal('trip-report')">✕</button>
+    </div>
+    <div class="modal-body" id="reportBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline full-width" onclick="shareReport()">📤 공유</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
 
@@ -571,6 +622,9 @@
 <script src="js/map.js"></script>
 <script src="js/expense.js"></script>
 <script src="js/recommend.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/vote.js"></script>
+<script src="js/report.js"></script>
 <script src="js/events.js"></script>
 <script src="js/main.js"></script>
 </body>

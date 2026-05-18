@@ -54,6 +54,17 @@ function renderGroupTab() {
     ml.appendChild(li);
   });
 
+  // 날씨 + 투표 로드
+  loadWeather();
+  loadVotes().then(() => renderVotes());
+
+  // 리포트 버튼
+  const reportBtn = document.getElementById('reportBtn');
+  if (reportBtn) {
+    reportBtn.onclick = null;
+    reportBtn.addEventListener('click', openTripReport);
+  }
+
   const infoBlock = document.getElementById('tripInfoBlock');
   const nights = g.startDate && g.endDate ? daysBetween(g.startDate, g.endDate) - 1 : 0;
   const adultsStr = g.adults != null ? `성인 ${g.adults}명` : '';

@@ -1413,3 +1413,135 @@ img { max-width: 100%; display: block; }
 .rec-loading-inline { text-align: center; padding: 20px; color: var(--text-3); font-size: 14px; }
 .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 8px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── 날씨 ─────────────────────────────────────────── */
+.weather-card { padding: 16px; }
+.weather-card .card-header { margin-bottom: 12px; }
+.weather-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.weather-scroll::-webkit-scrollbar { display: none; }
+.weather-day {
+  flex: 0 0 72px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 10px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--border);
+}
+.weather-day-date  { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.weather-day-emoji { font-size: 24px; line-height: 1.2; }
+.weather-day-label { font-size: 11px; color: var(--text-2); }
+.weather-day-temps { display: flex; gap: 4px; font-size: 12px; font-weight: 600; }
+.wt-max { color: var(--danger); }
+.wt-min { color: var(--accent); }
+.weather-day-precip { font-size: 10px; color: var(--text-3); }
+.weather-loading { text-align: center; padding: 20px; color: var(--text-3); }
+
+/* ─── 투표 ─────────────────────────────────────────── */
+.vote-empty { font-size: 13px; color: var(--text-3); text-align: center; padding: 16px 0; }
+.vote-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin-bottom: 12px;
+  transition: opacity .2s;
+}
+.vote-item:last-child { margin-bottom: 0; }
+.vote-item.vote-closed { opacity: .72; }
+.vote-question-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.vote-question { font-size: 14px; font-weight: 700; color: var(--text); flex: 1; }
+.vote-closed-badge { font-size: 11px; background: var(--border); color: var(--text-3); border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
+.vote-options { display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; }
+.vote-option {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.vote-option:not(.vote-closed-opt):hover { border-color: var(--primary); background: #fff8f5; }
+.vote-closed-opt { cursor: default; }
+.vote-opted { border-color: var(--primary) !important; background: #fff8f5; }
+.vote-winner { border-color: var(--success) !important; background: #f0fdf4; }
+.vote-option-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.vote-option-text { font-size: 13px; font-weight: 500; color: var(--text); }
+.vote-option-count { font-size: 12px; color: var(--text-3); }
+.vote-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.vote-bar { height: 100%; background: var(--primary); border-radius: 2px; transition: width .3s; }
+.vote-opted .vote-bar { background: var(--primary-d); }
+.vote-winner .vote-bar { background: var(--success); }
+.vote-meta { display: flex; align-items: center; justify-content: space-between; }
+.vote-total-count { font-size: 12px; color: var(--text-3); }
+.vote-actions { display: flex; gap: 6px; }
+.btn-danger-outline { color: var(--danger) !important; border-color: var(--danger) !important; }
+.btn-danger-outline:hover { background: #fef2f2 !important; }
+
+/* ─── 찜하기 ─────────────────────────────────────────── */
+.rec-wish-btn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 5px 8px;
+  font-size: 16px;
+  background: #fff;
+  cursor: pointer;
+  transition: transform .12s;
+}
+.rec-wish-btn:hover { transform: scale(1.15); }
+.rec-wish-btn.wished { border-color: #f87171; background: #fff5f5; }
+.wish-section { padding: 16px; }
+.wish-section .card-header { margin-bottom: 12px; }
+.wish-list { display: flex; flex-direction: column; gap: 8px; }
+.wish-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.wish-emoji { font-size: 20px; flex-shrink: 0; }
+.wish-info { flex: 1; min-width: 0; }
+.wish-name { font-size: 13px; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wish-desc { font-size: 11px; color: var(--text-3); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wish-btns { display: flex; gap: 5px; flex-shrink: 0; }
+
+/* ─── 리포트 ─────────────────────────────────────────── */
+.modal-report { max-width: 480px; max-height: 80dvh; display: flex; flex-direction: column; }
+.modal-report .modal-body { overflow-y: auto; }
+.report-section { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.report-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.report-section-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+.report-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.report-summary-item { background: var(--bg); border-radius: var(--radius-xs); padding: 8px 10px; }
+.rs-label { font-size: 11px; color: var(--text-3); display: block; margin-bottom: 2px; }
+.rs-value { font-size: 13px; font-weight: 600; color: var(--text); }
+.report-day-block { margin-bottom: 10px; }
+.report-day-label { font-size: 12px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+.report-day-date { font-weight: 400; color: var(--text-3); margin-left: 4px; }
+.report-place-list { padding-left: 4px; }
+.report-place-list li { font-size: 12px; color: var(--text-2); padding: 2px 0; }
+.report-place-time { color: var(--text-3); font-size: 11px; margin-right: 4px; }
+.report-expense-summary { display: flex; gap: 12px; margin-bottom: 10px; }
+.report-exp-row { flex: 1; background: var(--bg); border-radius: var(--radius-xs); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.report-exp-row span { font-size: 11px; color: var(--text-3); }
+.report-exp-row strong { font-size: 15px; font-weight: 700; color: var(--text); }
+.report-cat-list { display: flex; flex-direction: column; gap: 8px; }
+.report-cat-row { display: flex; flex-direction: column; gap: 4px; }
+.report-cat-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); }
+.report-cat-bar-wrap { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.report-cat-bar { height: 100%; background: var(--primary); border-radius: 3px; transition: width .4s; }
+.report-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.report-stat-item { background: var(--bg); border-radius: var(--radius-xs); padding: 10px 6px; text-align: center; }
+.stat-num { font-size: 20px; font-weight: 800; color: var(--primary); display: block; }
+.stat-label { font-size: 11px; color: var(--text-3); display: block; margin-top: 2px; }
+.report-empty { font-size: 13px; color: var(--text-3); padding: 4px 0; }
