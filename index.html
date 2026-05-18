@@ -7,6 +7,8 @@
   <meta name="description" content="단체 여행 일정 관리, 실시간 위치 공유, 경비 정산">
   <title>트립메이트 – 단체 여행 일정 관리</title>
   <link rel="stylesheet" href="styles.css">
+  <!-- 작업 5: Tesseract.js OCR -->
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 </head>
 <body>
 
@@ -180,25 +182,14 @@
       <button class="fab expense-fab" id="addExpenseBtn">+ 경비 추가</button>
     </section>
 
-    <!-- TAB: 맛집 -->
-    <section class="tab-pane" id="tab-local">
-      <div class="local-header">
-        <div class="my-location-row" id="myLocationRow">
-          <span>📍</span>
-          <span id="myLocationText">위치 확인 중...</span>
-          <button class="btn btn-sm btn-outline" id="refreshLocationBtn">새로고침</button>
+    <!-- TAB: 추천 (작업 7: 맛집 탭 → AI 추천 탭) -->
+    <section class="tab-pane" id="tab-recommend">
+      <div class="recommend-wrap" id="recommendWrap">
+        <div class="rec-loading" id="recLoading" style="display:none">
+          <div class="spinner"></div><p>추천 정보 불러오는 중...</p>
         </div>
-        <div class="cat-filter-bar scrollable" id="localCatBar">
-          <button class="cat-pill active" data-lcat="all">전체</button>
-          <button class="cat-pill" data-lcat="korean">🍱 한식</button>
-          <button class="cat-pill" data-lcat="cafe">☕ 카페</button>
-          <button class="cat-pill" data-lcat="western">🍝 양식</button>
-          <button class="cat-pill" data-lcat="japanese">🍣 일식</button>
-          <button class="cat-pill" data-lcat="chinese">🥡 중식</button>
-          <button class="cat-pill" data-lcat="snack">🍜 분식</button>
-        </div>
+        <div id="recContent"></div>
       </div>
-      <div class="restaurant-list" id="restaurantList"></div>
     </section>
 
   </main>
@@ -217,8 +208,9 @@
     <button class="tab-btn" data-tab="expense" role="tab" aria-selected="false">
       <span class="tab-icon">💰</span><span class="tab-label">경비</span>
     </button>
-    <button class="tab-btn" data-tab="local" role="tab" aria-selected="false">
-      <span class="tab-icon">🍽️</span><span class="tab-label">맛집</span>
+    <!-- 작업 7: 맛집 → 추천 탭 -->
+    <button class="tab-btn" data-tab="recommend" role="tab" aria-selected="false">
+      <span class="tab-icon">✨</span><span class="tab-label">추천</span>
     </button>
   </nav>
 
@@ -261,6 +253,30 @@
       <div class="form-group">
         <label for="cgMyName">내 이름 <span class="req">*</span></label>
         <input id="cgMyName" type="text" placeholder="예: 김여행" maxlength="12">
+      </div>
+      <!-- 작업 6: 멤버 구성 확장 -->
+      <div class="form-group">
+        <label>멤버 구성</label>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cgHouseholds">가구 수</label>
+            <input id="cgHouseholds" type="number" min="1" value="1">
+          </div>
+          <div class="form-group">
+            <label for="cgTotalPeople">총 인원</label>
+            <input id="cgTotalPeople" type="number" min="1" value="1">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cgAdults">성인</label>
+            <input id="cgAdults" type="number" min="0" value="1">
+          </div>
+          <div class="form-group">
+            <label for="cgInfants">유아</label>
+            <input id="cgInfants" type="number" min="0" value="0">
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -322,9 +338,29 @@
           <input id="etEnd" type="date">
         </div>
       </div>
+      <!-- 작업 6: 멤버 구성 확장 (edit-trip) -->
       <div class="form-group">
-        <label for="etHouseholds">가구 수</label>
-        <input id="etHouseholds" type="number" min="1" max="50" value="1">
+        <label>멤버 구성</label>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="etHouseholds">가구 수</label>
+            <input id="etHouseholds" type="number" min="1" value="1">
+          </div>
+          <div class="form-group">
+            <label for="etTotalPeople">총 인원</label>
+            <input id="etTotalPeople" type="number" min="1" value="1">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="etAdults">성인</label>
+            <input id="etAdults" type="number" min="0" value="1">
+          </div>
+          <div class="form-group">
+            <label for="etInfants">유아</label>
+            <input id="etInfants" type="number" min="0" value="0">
+          </div>
+        </div>
         <small class="hint">경비 가구당 분배에 사용됩니다</small>
       </div>
     </div>
@@ -389,6 +425,35 @@
   </div>
 </div>
 
+<!-- Edit Place (작업 3-2) -->
+<div class="modal-backdrop hidden" id="modal-edit-place">
+  <div class="modal">
+    <div class="modal-header"><h3>장소 수정</h3><button class="modal-close" onclick="closeModal('edit-place')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="epId">
+      <div class="form-group"><label>장소 이름 *</label><input id="epName" type="text"></div>
+      <div class="form-group"><label>종류</label>
+        <select id="epType">
+          <option value="attraction">🏛️ 관광지</option>
+          <option value="activity">🎯 놀거리</option>
+          <option value="accommodation">🏨 숙소</option>
+          <option value="restaurant">🍽️ 식당</option>
+          <option value="cafe">☕ 카페</option>
+          <option value="transport">🚌 교통</option>
+          <option value="shopping">🛍️ 쇼핑</option>
+          <option value="other">📍 기타</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>날짜</label><select id="epDay"></select></div>
+        <div class="form-group"><label>시간</label><input id="epTime" type="time"></div>
+      </div>
+      <div class="form-group"><label>메모</label><textarea id="epNote" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary full-width" id="confirmEditPlace">저장</button></div>
+  </div>
+</div>
+
 <!-- Add Expense -->
 <div class="modal-backdrop hidden" id="modal-add-expense" role="dialog" aria-modal="true" aria-labelledby="ae-title">
   <div class="modal">
@@ -431,6 +496,8 @@
         <div class="receipt-area">
           <input type="file" id="aeReceipt" accept="image/*" class="visually-hidden">
           <button class="btn btn-outline sm" id="receiptPickBtn">📷 사진 첨부</button>
+          <!-- 작업 5: OCR 버튼 -->
+          <button class="btn btn-outline sm" id="ocrReceiptBtn">📷 영수증 인식</button>
           <span id="receiptFileName" class="file-label"></span>
         </div>
         <div id="receiptThumb" class="receipt-thumb hidden"></div>
@@ -449,10 +516,22 @@
 <!-- Toast -->
 <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
 
-<!-- Supabase + Kakao + Leaflet + App -->
+<!-- 작업 1: app.js → js/ 분리 로드 순서 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js" integrity="sha384-TiCUE00h649CAMonG018J2ujOgDKW/kVWlChEuu4jK2vxfAAD0eZxzCKakxg55G4" crossorigin="anonymous"></script>
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=1ed552a04cbafec60a1206e37ee1bdeb&libraries=services&autoload=false"></script>
-<script src="app.js"></script>
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/state.js"></script>
+<script src="js/realtime.js"></script>
+<script src="js/kakao-auth.js"></script>
+<script src="js/screens.js"></script>
+<script src="js/group.js"></script>
+<script src="js/schedule.js"></script>
+<script src="js/map.js"></script>
+<script src="js/expense.js"></script>
+<script src="js/recommend.js"></script>
+<script src="js/events.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

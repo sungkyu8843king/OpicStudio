@@ -1060,3 +1060,30 @@ img { max-width: 100%; display: block; }
   #app { box-shadow: var(--shadow-lg); }
   body { background: #E8ECF2; }
 }
+
+/* ─── 장소 수정 버튼 ─────────────────────────────────── */
+.place-edit-btn {
+  color: var(--accent);
+  font-size: 15px;
+  padding: 0 4px;
+}
+
+/* ─── 추천 탭 ─────────────────────────────────────────── */
+.recommend-wrap { padding: 16px; }
+.rec-section { background: #fff; border-radius: var(--radius); padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+.rec-section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+.packing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.packing-item { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.packing-check { width: 16px; height: 16px; accent-color: var(--primary); }
+.packing-item:has(.packing-check:checked) span { text-decoration: line-through; color: var(--text-3); }
+.rec-place-list { display: flex; flex-direction: column; gap: 8px; }
+.rec-place-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; transition: background .15s; }
+.rec-place-item:hover { background: var(--bg); }
+.rec-place-name { font-size: 14px; font-weight: 600; }
+.rec-place-addr { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.rec-place-phone { font-size: 12px; color: var(--accent); margin-top: 2px; }
+.empty-rec { text-align: center; padding: 60px 20px; color: var(--text-3); }
+.empty-rec span { font-size: 40px; display: block; margin-bottom: 12px; }
+.rec-loading-inline { text-align: center; padding: 20px; color: var(--text-3); font-size: 14px; }
+.spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
