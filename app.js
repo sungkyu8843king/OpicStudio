@@ -439,6 +439,17 @@ function escapeHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function kakaoCategToType(cat) {
+  if (!cat) return 'other';
+  if (cat.includes('숙박') || cat.includes('호텔') || cat.includes('펜션') || cat.includes('게스트하우스')) return 'accommodation';
+  if (cat.includes('카페') || cat.includes('커피')) return 'cafe';
+  if (cat.includes('음식점') || cat.includes('식당') || cat.includes('맛집') || cat.includes('레스토랑')) return 'restaurant';
+  if (cat.includes('교통') || cat.includes('지하철') || cat.includes('버스') || cat.includes('공항') || cat.includes('기차') || cat.includes('항구') || cat.includes('터미널')) return 'transport';
+  if (cat.includes('쇼핑') || cat.includes('마트') || cat.includes('백화점') || cat.includes('편의점') || cat.includes('면세')) return 'shopping';
+  if (cat.includes('관광') || cat.includes('명소') || cat.includes('문화') || cat.includes('역사') || cat.includes('공원') || cat.includes('테마파크') || cat.includes('놀이')) return 'attraction';
+  return 'other';
+}
+
 let _destTimer = null;
 let _kakaoMapsReady = false;
 function ensureKakaoMaps() {
@@ -793,7 +804,8 @@ async function searchPlace() {
       item.onclick = () => {
         const addr = p.road_address_name || p.address_name || '';
         document.getElementById('apAddress').value = addr;
-        document.getElementById('apName').value = document.getElementById('apName').value || p.place_name;
+        document.getElementById('apName').value = p.place_name;
+        document.getElementById('apType').value = kakaoCategToType(p.category_name);
         const lat = parseFloat(p.y), lng = parseFloat(p.x);
         state.pendingPlace = { lat, lng, address: addr };
         const coords = document.getElementById('apCoords');

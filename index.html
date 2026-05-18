@@ -326,6 +326,15 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
+        <label>위치 검색</label>
+        <div class="input-row">
+          <input id="apAddress" type="text" placeholder="장소명 또는 주소">
+          <button class="btn btn-sm btn-outline" id="searchPlaceBtn">검색</button>
+        </div>
+        <div id="placeSearchResults" class="search-results hidden"></div>
+        <div id="apCoords" class="coord-badge hidden"></div>
+      </div>
+      <div class="form-group">
         <label for="apName">장소 이름 <span class="req">*</span></label>
         <input id="apName" type="text" placeholder="예: 성산일출봉">
       </div>
@@ -350,15 +359,6 @@
           <label for="apTime">시간</label>
           <input id="apTime" type="time" value="09:00">
         </div>
-      </div>
-      <div class="form-group">
-        <label>위치 검색</label>
-        <div class="input-row">
-          <input id="apAddress" type="text" placeholder="장소명 또는 주소">
-          <button class="btn btn-sm btn-outline" id="searchPlaceBtn">검색</button>
-        </div>
-        <div id="placeSearchResults" class="search-results hidden"></div>
-        <div id="apCoords" class="coord-badge hidden"></div>
       </div>
       <div class="form-group">
         <label for="apNote">메모</label>
