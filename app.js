@@ -472,8 +472,11 @@ function bindDestInput(inputId, suggestionsId) {
       if (!places.length) { box.classList.add('hidden'); return; }
       box.innerHTML = places.map(p => `
         <div class="place-suggestion-item" data-name="${escapeHtml(p.place_name)}">
-          <span class="ps-name">${escapeHtml(p.place_name)}</span>
-          <span class="ps-addr">${escapeHtml(p.road_address_name || p.address_name || '')}</span>
+          <div class="ps-icon">📍</div>
+          <div class="ps-text">
+            <span class="ps-name">${escapeHtml(p.place_name)}</span>
+            <span class="ps-addr">${escapeHtml(p.road_address_name || p.address_name || '')}</span>
+          </div>
         </div>`).join('');
       box.classList.remove('hidden');
       box.querySelectorAll('.place-suggestion-item').forEach(item => {
