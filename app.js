@@ -432,7 +432,53 @@ async function leaveGroup() {
 //  카카오 로그인 (OAuth authorization code flow)
 // ══════════════════════════════════════════════════════
 const KAKAO_APP_KEY  = '1ed552a04cbafec60a1206e37ee1bdeb';
+const KAKAO_REST_KEY = '7ace39f51d1cf293ddcd0e88da29ea5c';
 const KAKAO_REDIRECT = location.origin + location.pathname.replace(/\/$/, '');
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let _destTimer = null;
+async function searchKakaoPlaces(query) {
+  if (!query) return [];
+  try {
+    const res = await fetch(
+      `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=6`,
+      { headers: { Authorization: `KakaoAK ${KAKAO_REST_KEY}` } }
+    );
+    const data = await res.json();
+    return data.documents || [];
+  } catch { return []; }
+}
+
+function bindDestInput(inputId, suggestionsId) {
+  const input = document.getElementById(inputId);
+  const box = document.getElementById(suggestionsId);
+  if (!input || !box) return;
+  input.addEventListener('input', () => {
+    clearTimeout(_destTimer);
+    const q = input.value.trim();
+    if (q.length < 1) { box.classList.add('hidden'); return; }
+    _destTimer = setTimeout(async () => {
+      const places = await searchKakaoPlaces(q);
+      if (!places.length) { box.classList.add('hidden'); return; }
+      box.innerHTML = places.map(p => `
+        <div class="place-suggestion-item" data-name="${escapeHtml(p.place_name)}">
+          <span class="ps-name">${escapeHtml(p.place_name)}</span>
+          <span class="ps-addr">${escapeHtml(p.road_address_name || p.address_name || '')}</span>
+        </div>`).join('');
+      box.classList.remove('hidden');
+      box.querySelectorAll('.place-suggestion-item').forEach(item => {
+        item.addEventListener('click', () => {
+          input.value = item.dataset.name;
+          box.classList.add('hidden');
+        });
+      });
+    }, 300);
+  });
+  input.addEventListener('blur', () => setTimeout(() => box.classList.add('hidden'), 200));
+}
 
 async function getOrLoginKakao(intent) {
   const cached = localStorage.getItem(TM_KAKAO_KEY);
@@ -1305,6 +1351,10 @@ function bindEvents() {
     });
   });
   document.getElementById('refreshLocationBtn').addEventListener('click', requestLocation);
+
+  // 여행지 자동완성
+  bindDestInput('cgDest', 'cgDestSuggestions');
+  bindDestInput('etDest', 'etDestSuggestions');
 
   // URL 파라미터 (초대 링크: ?invite=XXXXXX)
   const urlParams = new URLSearchParams(location.search);
